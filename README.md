@@ -22,6 +22,10 @@ Put SDL3.Core.DLL in the lib folder then reference it and put SDL3.DLL with the 
 
 
 
+Put the assets folder with the exe you build.
+
+
+
 Move around with WASD keyboard keys.
 
 
@@ -37,6 +41,4 @@ License: MIT
 Copyright: © 2016 Bunny83
 
 [GitHub Source](https://github.com/Bunny83/UnityWebExamples/tree/master/VisPortals)
-
-
 
