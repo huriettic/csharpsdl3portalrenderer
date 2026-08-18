@@ -18,11 +18,15 @@ SDL3-CS - [https://github.com/flibitijibibo/SDL3-CS](https://github.com/flibitij
 
 
 
-Put SDL3.Core.DLL and SDL3.DLL with the exe you build.
+Put SDL3.DLL with the exe you build.
 
 
 
 Put the assets folder with the exe you build.
+
+
+
+Create a folder then put SDL3.Core.DLL in it and reference it.
 
 
 
