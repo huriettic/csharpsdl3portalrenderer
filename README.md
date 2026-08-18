@@ -18,7 +18,7 @@ SDL3-CS - [https://github.com/flibitijibibo/SDL3-CS](https://github.com/flibitij
 
 
 
-Put SDL3.Core.DLL in the lib folder then reference it and put SDL3.DLL with the exe you build.
+Put SDL3.Core.DLL and SDL3.DLL with the exe you build.
 
 
 
