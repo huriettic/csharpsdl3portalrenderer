@@ -55,8 +55,8 @@ public static class LevelDraw
         public static Vector3 Position = playerStartPosition;
         public static float Speed = 6f;
 
-        // Camera yaw in degrees
         public static float Yaw = 180f;
+        public static float Pitch = 0f;
 
         public static bool QuitRequested = false;
 
@@ -82,25 +82,37 @@ public static class LevelDraw
                 Yaw -= 90f * dt;
             }
 
-            // Convert yaw to radians
-            float rad = Yaw * (MathF.PI / 180f);
+            if (Down(SDL_Scancode.SDL_SCANCODE_Q))
+            {
+                Pitch += 60f * dt;
+            }
+
+            if (Down(SDL_Scancode.SDL_SCANCODE_E))
+            {
+                Pitch -= 60f * dt;
+            }
+
+            Pitch = Math.Clamp(Pitch, -89f, 89f);
+
+            float yawRad = Yaw * (MathF.PI / 180f);
+            float pitchRad = Pitch * (MathF.PI / 180f);
+
+            Vector3 forward = new Vector3(-MathF.Sin(yawRad) * MathF.Cos(pitchRad), MathF.Sin(pitchRad), -MathF.Cos(yawRad) * MathF.Cos(pitchRad));
 
             if (Down(SDL_Scancode.SDL_SCANCODE_W))
             {
-                Position.X -= MathF.Sin(rad) * Speed * dt;
-                Position.Z -= MathF.Cos(rad) * Speed * dt;
+                Position += forward * Speed * dt;
             }
 
             if (Down(SDL_Scancode.SDL_SCANCODE_S))
             {
-                Position.X += MathF.Sin(rad) * Speed * dt;
-                Position.Z += MathF.Cos(rad) * Speed * dt;
-            }
+                Position -= forward * Speed * dt;
+            }   
         }
 
         public static void UpdateCamera()
         {
-            Camera3D.Rotation = new Vector3(0f, Yaw * (MathF.PI / 180f), 0f);
+            Camera3D.Rotation = new Vector3(Pitch * (MathF.PI / 180f), Yaw * (MathF.PI / 180f), 0f);
 
             Camera3D.Position = Position;
             Camera3D.UpdateMatrices();
