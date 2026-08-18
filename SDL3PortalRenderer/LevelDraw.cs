@@ -230,22 +230,22 @@ public static class LevelDraw
             return;
         }
 
-        nint surface = (nint)SDL_LoadSurface("assets/texture.png");
-        if (surface == 0)
+        nint texture = (nint)SDL_LoadPNG("assets/texture.png");
+        if (texture == 0)
         {
             Console.WriteLine("Failed to load PNG surface: " + SDL_GetError());
         }
 
-        SDL_Surface surf = Marshal.PtrToStructure<SDL_Surface>(surface);
+        SDL_Surface tex = Marshal.PtrToStructure<SDL_Surface>(texture);
 
-        if (surf.pixels == IntPtr.Zero)
+        if (tex.pixels == IntPtr.Zero)
         {
             Console.WriteLine("surf.pixels is NULL — no pixel data.");
             return;
         }
 
-        texWidth = surf.w;
-        texHeight = surf.h;
+        texWidth = tex.w;
+        texHeight = tex.h;
 
         uint[] sampleTexture = new uint[texWidth * texHeight];
 
@@ -257,7 +257,7 @@ public static class LevelDraw
 
         unsafe
         {
-            uint* surfPixels = (uint*)surf.pixels;
+            uint* surfPixels = (uint*)tex.pixels;
 
             for (int i = 0; i < texWidth * texHeight; i++)
             {
@@ -268,7 +268,7 @@ public static class LevelDraw
         uint first = sampleTexture[0];
         Console.WriteLine($"First pixel: 0x{first:X8}");
 
-        SDL_DestroySurface(surface);
+        SDL_DestroySurface(texture);
 
         bool running = true;
         SDL_Event evt;
