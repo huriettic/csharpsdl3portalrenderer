@@ -351,10 +351,7 @@ public static class LevelDraw
                 Vector2 screen1 = new((tri.c1.X * invw1 * 0.5f + 0.5f) * w, (1.0f - (tri.c1.Y * invw1 * 0.5f + 0.5f)) * h);
                 Vector2 screen2 = new((tri.c2.X * invw2 * 0.5f + 0.5f) * w, (1.0f - (tri.c2.Y * invw2 * 0.5f + 0.5f)) * h);
 
-                Vector2 se1 = screen1 - screen0;
-                Vector2 se2 = screen2 - screen0;
-
-                float area = se1.X * se2.Y - se1.Y * se2.X;
+                float area = (screen0.Y - screen1.Y) * screen2.X + (screen1.X - screen0.X) * screen2.Y + (screen0.X * screen1.Y - screen0.Y * screen1.X);
 
                 if (MathF.Abs(area) < 1e-5f || area > 0f)
                 {
@@ -363,7 +360,6 @@ public static class LevelDraw
 
                 int xmin = (int)MathF.Floor(MathF.Min(screen0.X, MathF.Min(screen1.X, screen2.X)));
                 int ymin = (int)MathF.Floor(MathF.Min(screen0.Y, MathF.Min(screen1.Y, screen2.Y)));
-
                 int xmax = (int)MathF.Ceiling(MathF.Max(screen0.X, MathF.Max(screen1.X, screen2.X)));
                 int ymax = (int)MathF.Ceiling(MathF.Max(screen0.Y, MathF.Max(screen1.Y, screen2.Y)));
 
@@ -372,19 +368,7 @@ public static class LevelDraw
                 xmax = Math.Clamp(xmax, 0, w - 1);
                 ymax = Math.Clamp(ymax, 0, h - 1);
 
-                float invArea = 1f / area;
-
-                float a0 = -(screen2.Y - screen1.Y);
-                float b0 = screen2.X - screen1.X;
-                float c0 = -(screen2.X * screen1.Y - screen2.Y * screen1.X);
-
-                float a1 = -(screen0.Y - screen2.Y);
-                float b1 = screen0.X - screen2.X;
-                float c1 = -(screen0.X * screen2.Y - screen0.Y * screen2.X);
-
-                float a2 = -(screen1.Y - screen0.Y);
-                float b2 = screen1.X - screen0.X;
-                float c2 = -(screen1.X * screen0.Y - screen1.Y * screen0.X);
+                float invArea = 1.0f / area;
 
                 for (int y = ymin; y <= ymax; y++)
                 {
@@ -394,9 +378,9 @@ public static class LevelDraw
                     {
                         float px = x + 0.5f;
 
-                        float edge0 = a0 * px + b0 * py + c0;
-                        float edge1 = a1 * px + b1 * py + c1;
-                        float edge2 = a2 * px + b2 * py + c2;
+                        float edge0 = (screen1.Y - screen2.Y) * px + (screen2.X - screen1.X) * py + (screen1.X * screen2.Y - screen1.Y * screen2.X);
+                        float edge1 = (screen2.Y - screen0.Y) * px + (screen0.X - screen2.X) * py + (screen2.X * screen0.Y - screen2.Y * screen0.X);
+                        float edge2 = (screen0.Y - screen1.Y) * px + (screen1.X - screen0.X) * py + (screen0.X * screen1.Y - screen0.Y * screen1.X);
 
                         if (edge0 > 0f || edge1 > 0f || edge2 > 0f)
                         {
@@ -411,9 +395,9 @@ public static class LevelDraw
 
                         float z = (weight0 * invz0 + weight1 * invz1 + weight2 * invz2) / iweight;
 
-                        int zp = y * w + x;
+                        int zd = y * w + x;
 
-                        if (z >= depthBuffer[zp])
+                        if (z >= depthBuffer[zd])
                         {
                             continue;
                         }
@@ -426,6 +410,9 @@ public static class LevelDraw
                         int tx = (int)(uWrapped * (texWidth - 1));
                         int ty = (int)(vWrapped * (texHeight - 1));
 
+                        tx = Math.Clamp(tx, 0, texWidth - 1);
+                        ty = Math.Clamp(ty, 0, texHeight - 1);
+
                         uint col = sampleTexture[ty * texWidth + tx];
 
                         SDL_SetRenderDrawColor(renderer,
@@ -436,7 +423,7 @@ public static class LevelDraw
 
                         SDL_RenderPoint(renderer, x, y);
 
-                        depthBuffer[zp] = z;
+                        depthBuffer[zd] = z;
                     }
                 }
             }
