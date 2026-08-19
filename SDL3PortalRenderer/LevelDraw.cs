@@ -230,7 +230,7 @@ public static class LevelDraw
             return;
         }
 
-        nint texture = (nint)SDL_LoadPNG("assets/texture.png");
+        nint texture = (nint)SDL_LoadSurface("assets/texture.png");
         if (texture == 0)
         {
             Console.WriteLine("Failed to load PNG surface: " + SDL_GetError());
