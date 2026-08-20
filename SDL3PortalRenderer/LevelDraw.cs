@@ -29,7 +29,7 @@ public static class LevelDraw
 
         public static float FovRadians = MathF.PI / 3f;
         public static float AspectRatio = 16f / 9f;
-        public static float NearClip = 0.1f;
+        public static float NearClip = 0.3f;
         public static float FarClip = 1000f;
 
         public static Matrix4x4 ViewMatrix;
@@ -50,6 +50,75 @@ public static class LevelDraw
         }
     }
 
+    //public static class SDLPlayerController
+    //{
+    //    public static Vector3 Position = playerStartPosition;
+    //    public static float Speed = 6f;
+
+    //    public static float Yaw = 180f;
+    //    public static float Pitch = 0f;
+
+    //    public static bool QuitRequested = false;
+
+    //    public static unsafe void HandleMovement(float dt)
+    //    {
+    //        int numKeys;
+    //        byte* keys = (byte*)SDL_GetKeyboardState(out numKeys);
+
+    //        bool Down(SDL_Scancode sc) => keys[(int)sc] != 0;
+
+    //        if (Down(SDL_Scancode.SDL_SCANCODE_ESCAPE))
+    //        {
+    //            QuitRequested = true;
+    //        }
+
+    //        if (Down(SDL_Scancode.SDL_SCANCODE_A))
+    //        {
+    //            Yaw += 90f * dt;
+    //        }
+
+    //        if (Down(SDL_Scancode.SDL_SCANCODE_D))
+    //        {
+    //            Yaw -= 90f * dt;
+    //        }
+
+    //        if (Down(SDL_Scancode.SDL_SCANCODE_Q))
+    //        {
+    //            Pitch += 60f * dt;
+    //        }
+
+    //        if (Down(SDL_Scancode.SDL_SCANCODE_E))
+    //        {
+    //            Pitch -= 60f * dt;
+    //        }
+
+    //        Pitch = Math.Clamp(Pitch, -89f, 89f);
+
+    //        float yawRad = Yaw * (MathF.PI / 180f);
+    //        float pitchRad = Pitch * (MathF.PI / 180f);
+
+    //        Vector3 forward = new Vector3(-MathF.Sin(yawRad) * MathF.Cos(pitchRad), MathF.Sin(pitchRad), -MathF.Cos(yawRad) * MathF.Cos(pitchRad));
+
+    //        if (Down(SDL_Scancode.SDL_SCANCODE_W))
+    //        {
+    //            Position += forward * Speed * dt;
+    //        }
+
+    //        if (Down(SDL_Scancode.SDL_SCANCODE_S))
+    //        {
+    //            Position -= forward * Speed * dt;
+    //        }   
+    //    }
+
+    //    public static void UpdateCamera()
+    //    {
+    //        Camera3D.Rotation = new Vector3(Pitch * (MathF.PI / 180f), Yaw * (MathF.PI / 180f), 0f);
+
+    //        Camera3D.Position = Position;
+    //        Camera3D.UpdateMatrices();
+    //    }
+    //}
+
     public static class SDLPlayerController
     {
         public static Vector3 Position = playerStartPosition;
@@ -57,6 +126,8 @@ public static class LevelDraw
 
         public static float Yaw = 180f;
         public static float Pitch = 0f;
+
+        public static float MouseSensitivity = 0.1f;
 
         public static bool QuitRequested = false;
 
@@ -72,25 +143,11 @@ public static class LevelDraw
                 QuitRequested = true;
             }
 
-            if (Down(SDL_Scancode.SDL_SCANCODE_A))
-            {
-                Yaw += 90f * dt;
-            }
+            float mx, my;
+            SDL_GetRelativeMouseState(out mx, out my);
 
-            if (Down(SDL_Scancode.SDL_SCANCODE_D))
-            {
-                Yaw -= 90f * dt;
-            }
-
-            if (Down(SDL_Scancode.SDL_SCANCODE_Q))
-            {
-                Pitch += 60f * dt;
-            }
-
-            if (Down(SDL_Scancode.SDL_SCANCODE_E))
-            {
-                Pitch -= 60f * dt;
-            }
+            Yaw -= mx * MouseSensitivity;
+            Pitch -= my * MouseSensitivity;
 
             Pitch = Math.Clamp(Pitch, -89f, 89f);
 
@@ -98,6 +155,8 @@ public static class LevelDraw
             float pitchRad = Pitch * (MathF.PI / 180f);
 
             Vector3 forward = new Vector3(-MathF.Sin(yawRad) * MathF.Cos(pitchRad), MathF.Sin(pitchRad), -MathF.Cos(yawRad) * MathF.Cos(pitchRad));
+
+            forward = Vector3.Normalize(forward);
 
             if (Down(SDL_Scancode.SDL_SCANCODE_W))
             {
@@ -107,7 +166,19 @@ public static class LevelDraw
             if (Down(SDL_Scancode.SDL_SCANCODE_S))
             {
                 Position -= forward * Speed * dt;
-            }   
+            }
+
+            Vector3 right = new Vector3(MathF.Sin(yawRad + MathF.PI / 2f), 0f, MathF.Cos(yawRad + MathF.PI / 2f));
+
+            if (Down(SDL_Scancode.SDL_SCANCODE_A))
+            {
+                Position -= right * Speed * dt;
+            }
+
+            if (Down(SDL_Scancode.SDL_SCANCODE_D))
+            {
+                Position += right * Speed * dt;
+            }
         }
 
         public static void UpdateCamera()
@@ -222,12 +293,40 @@ public static class LevelDraw
             return;
         }
 
-        if (!SDL_CreateWindowAndRenderer("Triangle SDL3 Window", w, h, 0,
-            out nint window, out nint renderer))
+        nint window = SDL_CreateWindow("SDL3 Window", 0, 0, SDL_WindowFlags.SDL_WINDOW_FULLSCREEN);
+
+        if (window == 0)
         {
-            Console.WriteLine("Failed to create window/renderer: " + SDL_GetError());
+            Console.WriteLine("SDL_CreateWindow failed: " + SDL_GetError());
             SDL_Quit();
             return;
+        }
+
+        nint renderer = SDL_CreateRenderer(window, null);
+
+        if (renderer == 0)
+        {
+            Console.WriteLine("SDL_CreateRenderer failed: " + SDL_GetError());
+            SDL_DestroyWindow(window);
+            SDL_Quit();
+            return;
+        }
+
+        Console.WriteLine("SDL window and renderer created successfully!");
+
+        if (!SDL_SetRenderVSync(renderer, 1))
+        {
+            Console.WriteLine("Could not set VSync! SDL_Error: " + SDL_GetError());
+        }
+
+        if (!SDL_SetRenderLogicalPresentation(renderer, w, h, SDL_RendererLogicalPresentation.SDL_LOGICAL_PRESENTATION_INTEGER_SCALE))
+        {
+            Console.WriteLine("Could not set logical presentation size! SDL_Error: " + SDL_GetError());
+        }
+
+        if(!SDL_SetWindowRelativeMouseMode(window, true))
+        {
+            Console.WriteLine("Could not set mouse mode! SDL_Error: " + SDL_GetError());
         }
 
         nint texture = (nint)SDL_LoadSurface("assets/texture.png");
@@ -249,22 +348,10 @@ public static class LevelDraw
 
         uint[] sampleTexture = new uint[texWidth * texHeight];
 
-        if (sampleTexture.Length != texWidth * texHeight)
-        {
-            Console.WriteLine("sampleTexture length mismatch.");
-            return;
-        }
+        var texPixels = new ReadOnlySpan<uint>((uint*)tex.pixels, sampleTexture.Length);
 
-        unsafe
-        {
-            uint* surfPixels = (uint*)tex.pixels;
-
-            for (int i = 0; i < texWidth * texHeight; i++)
-            {
-                sampleTexture[i] = surfPixels[i];
-            } 
-        }
-
+        texPixels.CopyTo(sampleTexture);
+        
         uint first = sampleTexture[0];
         Console.WriteLine($"First pixel: 0x{first:X8}");
 
@@ -335,9 +422,9 @@ public static class LevelDraw
 
             foreach (Triangle tri in Triangles)
             {
-                float invw0 = 1f / tri.c0.W;
-                float invw1 = 1f / tri.c1.W;
-                float invw2 = 1f / tri.c2.W;
+                float invw0 = 1.0f / tri.c0.W;
+                float invw1 = 1.0f / tri.c1.W;
+                float invw2 = 1.0f / tri.c2.W;
 
                 float invz0 = tri.c0.Z * invw0;
                 float invz1 = tri.c1.Z * invw1;
@@ -358,6 +445,8 @@ public static class LevelDraw
                     continue;
                 }
 
+                float invArea = 1.0f / area;
+
                 int xmin = (int)MathF.Floor(MathF.Min(screen0.X, MathF.Min(screen1.X, screen2.X)));
                 int ymin = (int)MathF.Floor(MathF.Min(screen0.Y, MathF.Min(screen1.Y, screen2.Y)));
                 int xmax = (int)MathF.Ceiling(MathF.Max(screen0.X, MathF.Max(screen1.X, screen2.X)));
@@ -367,8 +456,6 @@ public static class LevelDraw
                 ymin = Math.Clamp(ymin, 0, h - 1);
                 xmax = Math.Clamp(xmax, 0, w - 1);
                 ymax = Math.Clamp(ymax, 0, h - 1);
-
-                float invArea = 1.0f / area;
 
                 for (int y = ymin; y <= ymax; y++)
                 {
