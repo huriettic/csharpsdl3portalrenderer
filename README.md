@@ -34,7 +34,7 @@ Move around with WASD keyboard keys.
 
 
 
-This project uses code derived from VisPortals by Bunny83.
+This project uses code derived from VisPortals by Bunny83 and Real-Time Collision Detection by Christer Ericson.
 
 
 
@@ -45,4 +45,10 @@ License: MIT
 Copyright: © 2016 Bunny83
 
 [GitHub Source](https://github.com/Bunny83/UnityWebExamples/tree/master/VisPortals)
+
+
+
+“from Real-Time Collision Detection by Christer Ericson, published by Morgan Kaufmann Publishers, © 2005 Elsevier Inc”.
+
+
 
