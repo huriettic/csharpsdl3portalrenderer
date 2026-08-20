@@ -386,7 +386,7 @@ public static class LevelDraw
                 Camera3D.Position, radius, check, TopLevelLists.planes
             );
 
-            SetCollision(contactingSectors, TopLevelLists.collision);
+            SetCollision(contactingSectors, TopLevelLists.collision, TopLevelLists.vertices, TopLevelLists.indices);
 
             Array.Clear(visibleSectors, 0, visibleSectors.Length);
 
@@ -410,10 +410,6 @@ public static class LevelDraw
                 processnormals, temporarynormals,
                 Triangles, Camera3D.ViewProjectionMatrix
             );
-
-            Console.WriteLine(Triangles.Count);
-            Console.WriteLine(Camera3D.Position);
-            Console.WriteLine(CurrentSector.sectorId);
 
             Array.Fill(depthBuffer, float.PositiveInfinity);
 

@@ -25,5 +25,14 @@ VisPortals
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-Assets\VisPortal\VisAreaManager.cs
-Assets\VisPortal\CameraExtension.cs
+===============================================================================
+
+“from Real-Time Collision Detection by Christer Ericson, published by Morgan Kaufmann Publishers, © 2005 Elsevier Inc”.
+
+Section 5.1.5
+
+ClosestPtPointTriangle
+
+Section 5.2.7
+
+TestSphereTriangle

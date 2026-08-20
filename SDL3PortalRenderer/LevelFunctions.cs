@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using static LevelDraw;
 
 public struct Triangle
 {
@@ -402,19 +403,110 @@ public static class LevelFunctions
         return CurrentSector;
     }
 
-    public static void SetCollision(int[] contactingSectors, List<ColliderMeta> collision)
+    public static void SetCollision(int[] contactingSectors, List<ColliderMeta> collision, List<Vector3> vertices, List<int> triangles)
     {
+        Vector3 camPos = SDLPlayerController.Position;
+
+        float radius = 1.0f;
+
         for (int a = 0; a < contactingSectors.Length; a++)
         {
             int count = contactingSectors[a];
 
-            if (count == 0)
-            {
+            if (contactingSectors[a] == 0)
                 continue;
-            }
 
-            ColliderMeta sectorCollide = collision[a];
+            ColliderMeta collide = collision[a];
+
+            for (int t = collide.indicesStartIndex; t < collide.indicesStartIndex + collide.indicesCount; t += 3)
+            {
+                Vector3 A = vertices[triangles[t]];
+                Vector3 B = vertices[triangles[t + 1]];
+                Vector3 C = vertices[triangles[t + 2]];
+
+                // Find point P on triangle ABC closest to sphere center
+                Vector3 p = ClosestPtPointTriangle(camPos, A, B, C);
+
+                // Sphere and triangle intersect if the (squared) distance from sphere
+                // center to point p is less than the (squared) sphere radius
+                Vector3 v = p - camPos;
+
+                float distSq = Vector3.Dot(v, v);
+
+                if (distSq <= radius * radius)
+                {
+                    float dist = MathF.Sqrt(distSq);
+                    float penetration = radius - dist;
+                    if (dist > 1e-6f)
+                    {
+                        v /= dist;
+                    }
+                    else
+                    {
+                        v = Vector3.Normalize(Vector3.Cross(B - A, C - A));
+                    }
+
+                    camPos -= v * penetration;
+                }
+            }
         }
+
+        SDLPlayerController.Position = camPos;
+    }
+
+    //“from Real-Time Collision Detection by Christer Ericson, published by Morgan Kaufmann Publishers, © 2005 Elsevier Inc”.
+
+    public static Vector3 ClosestPtPointTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
+    {
+        // Check if P in vertex region outside A
+        Vector3 ab = b - a;
+        Vector3 ac = c - a;
+        Vector3 ap = p - a;
+        float d1 = Vector3.Dot(ab, ap);
+        float d2 = Vector3.Dot(ac, ap);
+        if (d1 <= 0.0f && d2 <= 0.0f) return a; // barycentric coordinates (1,0,0)
+
+        // Check if P in vertex region outside B
+        Vector3 bp = p - b;
+        float d3 = Vector3.Dot(ab, bp);
+        float d4 = Vector3.Dot(ac, bp);
+        if (d3 >= 0.0f && d4 <= d3) return b; // barycentric coordinates (0,1,0)
+
+        // Check if P in edge region of AB, if so return projection of P onto AB
+        float vc = d1 * d4 - d3 * d2;
+        if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)
+        {
+            float v = d1 / (d1 - d3);
+            return a + v * ab; // barycentric coordinates (1-v,v,0)
+        }
+
+        // Check if P in vertex region outside C
+        Vector3 cp = p - c;
+        float d5 = Vector3.Dot(ab, cp);
+        float d6 = Vector3.Dot(ac, cp);
+        if (d6 >= 0.0f && d5 <= d6) return c; // barycentric coordinates (0,0,1)
+
+        // Check if P in edge region of AC, if so return projection of P onto AC
+        float vb = d5 * d2 - d1 * d6;
+        if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)
+        {
+            float w = d2 / (d2 - d6);
+            return a + w * ac; // barycentric coordinates (1-w,0,w)
+        }
+
+        // Check if P in edge region of BC, if so return projection of P onto BC
+        float va = d3 * d6 - d5 * d4;
+        if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f)
+        {
+            float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+            return b + w * (c - b); // barycentric coordinates (0,1-w,w)
+        }
+
+        // P inside face region. Compute Q through its barycentric coordinates (u,v,w)
+        float denom = 1.0f / (va + vb + vc);
+        float v2 = vb * denom;
+        float w2 = vc * denom;
+        return a + ab * v2 + ac * w2; // = u*a + v*b + w*c, u = va * denom = 1.0f - v - w
     }
 
     public static SectorMeta PlayerStart(List<StartPosition> positions, List<SectorMeta> sectors, Random rng, ref Vector3 playerStartPosition)
