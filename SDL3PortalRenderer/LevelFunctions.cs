@@ -403,57 +403,6 @@ public static class LevelFunctions
         return CurrentSector;
     }
 
-    public static void SetCollision(int[] contactingSectors, List<ColliderMeta> collision, List<Vector3> vertices, List<int> triangles)
-    {
-        Vector3 camPos = SDLPlayerController.Position;
-
-        float radius = 1.0f;
-
-        for (int a = 0; a < contactingSectors.Length; a++)
-        {
-            int count = contactingSectors[a];
-
-            if (contactingSectors[a] == 0)
-                continue;
-
-            ColliderMeta collide = collision[a];
-
-            for (int t = collide.indicesStartIndex; t < collide.indicesStartIndex + collide.indicesCount; t += 3)
-            {
-                Vector3 A = vertices[triangles[t]];
-                Vector3 B = vertices[triangles[t + 1]];
-                Vector3 C = vertices[triangles[t + 2]];
-
-                // Find point P on triangle ABC closest to sphere center
-                Vector3 p = ClosestPtPointTriangle(camPos, A, B, C);
-
-                // Sphere and triangle intersect if the (squared) distance from sphere
-                // center to point p is less than the (squared) sphere radius
-                Vector3 v = p - camPos;
-
-                float distSq = Vector3.Dot(v, v);
-
-                if (distSq <= radius * radius)
-                {
-                    float dist = MathF.Sqrt(distSq);
-                    float penetration = radius - dist;
-                    if (dist > 1e-6f)
-                    {
-                        v /= dist;
-                    }
-                    else
-                    {
-                        v = Vector3.Normalize(Vector3.Cross(B - A, C - A));
-                    }
-
-                    camPos -= v * penetration;
-                }
-            }
-        }
-
-        SDLPlayerController.Position = camPos;
-    }
-
     //“from Real-Time Collision Detection by Christer Ericson, published by Morgan Kaufmann Publishers, © 2005 Elsevier Inc”.
 
     public static Vector3 ClosestPtPointTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)

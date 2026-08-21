@@ -181,6 +181,53 @@ public static class LevelDraw
             }
         }
 
+        public static void SetCollision(int[] contactingSectors, List<ColliderMeta> collision, List<Vector3> vertices, List<int> triangles)
+        {
+            float radius = 1.0f;
+
+            for (int a = 0; a < contactingSectors.Length; a++)
+            {
+                int count = contactingSectors[a];
+
+                if (contactingSectors[a] == 0)
+                    continue;
+
+                ColliderMeta collide = collision[a];
+
+                for (int t = collide.indicesStartIndex; t < collide.indicesStartIndex + collide.indicesCount; t += 3)
+                {
+                    Vector3 A = vertices[triangles[t]];
+                    Vector3 B = vertices[triangles[t + 1]];
+                    Vector3 C = vertices[triangles[t + 2]];
+
+                    // Find point P on triangle ABC closest to sphere center
+                    Vector3 p = ClosestPtPointTriangle(Position, A, B, C);
+
+                    // Sphere and triangle intersect if the (squared) distance from sphere
+                    // center to point p is less than the (squared) sphere radius
+                    Vector3 v = p - Position;
+
+                    float distSq = Vector3.Dot(v, v);
+
+                    if (distSq <= radius * radius)
+                    {
+                        float dist = MathF.Sqrt(distSq);
+                        float penetration = radius - dist;
+                        if (dist > 1e-6f)
+                        {
+                            v /= dist;
+                        }
+                        else
+                        {
+                            v = Vector3.Normalize(Vector3.Cross(B - A, C - A));
+                        }
+
+                        Position -= v * penetration;
+                    }
+                }
+            }
+        }
+
         public static void UpdateCamera()
         {
             Camera3D.Rotation = new Vector3(Pitch * (MathF.PI / 180f), Yaw * (MathF.PI / 180f), 0f);
@@ -287,6 +334,8 @@ public static class LevelDraw
         visibleSectors = VisibleSectorsMake(TopLevelLists.sectors);
         contactingSectors = contactSectorsMake(TopLevelLists.sectors);
 
+        contactingSectors[CurrentSector.sectorId] = 1;
+
         if (!SDL_Init(SDL_InitFlags.SDL_INIT_VIDEO))
         {
             Console.WriteLine("Failed to init SDL: " + SDL_GetError());
@@ -371,6 +420,7 @@ public static class LevelDraw
             float dt = GetDeltaTime();
 
             SDLPlayerController.HandleMovement(dt);
+            SDLPlayerController.SetCollision(contactingSectors, TopLevelLists.collision, TopLevelLists.vertices, TopLevelLists.indices);
             SDLPlayerController.UpdateCamera();
 
             if (SDLPlayerController.QuitRequested)
@@ -385,8 +435,6 @@ public static class LevelDraw
                 TopLevelLists.portals, TopLevelLists.sectors,
                 Camera3D.Position, radius, check, TopLevelLists.planes
             );
-
-            SetCollision(contactingSectors, TopLevelLists.collision, TopLevelLists.vertices, TopLevelLists.indices);
 
             Array.Clear(visibleSectors, 0, visibleSectors.Length);
 
