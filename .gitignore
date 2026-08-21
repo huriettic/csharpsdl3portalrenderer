@@ -399,3 +399,7 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Block all compiled DLLs from your workspace
+*.dll
+*.exe
