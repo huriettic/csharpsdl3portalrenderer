@@ -183,14 +183,15 @@ public static class LevelDraw
 
         public static void SetCollision(int[] contactingSectors, List<ColliderMeta> collision, List<Vector3> vertices, List<int> triangles)
         {
-            float radius = 1.0f;
+            float Radius = 1.25f;
+            Vector3 pos = Position;
 
             for (int a = 0; a < contactingSectors.Length; a++)
             {
-                int count = contactingSectors[a];
-
                 if (contactingSectors[a] == 0)
+                {
                     continue;
+                }
 
                 ColliderMeta collide = collision[a];
 
@@ -200,39 +201,44 @@ public static class LevelDraw
                     Vector3 B = vertices[triangles[t + 1]];
                     Vector3 C = vertices[triangles[t + 2]];
 
-                    // Find point P on triangle ABC closest to sphere center
-                    Vector3 p = ClosestPtPointTriangle(Position, A, B, C);
+                    Vector3 closest = Vector3.Zero;
+                    Vector3 diff = Vector3.Zero;
 
-                    // Sphere and triangle intersect if the (squared) distance from sphere
-                    // center to point p is less than the (squared) sphere radius
-                    Vector3 v = p - Position;
+                    float distSq = TestSphereTriangle(pos, A, B, C, Radius, ref closest, ref diff);
 
-                    float distSq = Vector3.Dot(v, v);
-
-                    if (distSq <= radius * radius)
+                    if (distSq > Radius * Radius)
                     {
-                        float dist = MathF.Sqrt(distSq);
-                        float penetration = radius - dist;
-                        if (dist > 1e-6f)
-                        {
-                            v /= dist;
-                        }
-                        else
-                        {
-                            v = Vector3.Normalize(Vector3.Cross(B - A, C - A));
-                        }
-
-                        Position -= v * penetration;
+                        continue;
                     }
+
+                    float dist = MathF.Sqrt(distSq);
+
+                    Vector3 normal;
+                    float penetration;
+
+                    if (dist > 1e-6f)
+                    {
+                        normal = diff / dist;
+                        penetration = Radius - dist;
+                    }
+                    else
+                    {
+                        normal = Vector3.Normalize(Vector3.Cross(B - A, C - A));
+                        penetration = Radius;
+                    }
+
+                    pos += normal * penetration;
                 }
             }
+
+            Position = pos;
         }
 
         public static void UpdateCamera()
         {
             Camera3D.Rotation = new Vector3(Pitch * (MathF.PI / 180f), Yaw * (MathF.PI / 180f), 0f);
 
-            Camera3D.Position = Position;
+            Camera3D.Position = new Vector3(Position.X + 0.01f, Position.Y, Position.Z);
             Camera3D.UpdateMatrices();
         }
     }

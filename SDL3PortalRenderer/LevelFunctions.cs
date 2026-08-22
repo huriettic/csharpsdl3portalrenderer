@@ -405,6 +405,18 @@ public static class LevelFunctions
 
     //“from Real-Time Collision Detection by Christer Ericson, published by Morgan Kaufmann Publishers, © 2005 Elsevier Inc”.
 
+    public static float TestSphereTriangle(Vector3 s, Vector3 a, Vector3 b, Vector3 c, float radius, ref Vector3 p, ref Vector3 v)
+    {
+        // Find point P on triangle ABC closest to sphere center
+        p = ClosestPtPointTriangle(s, a, b, c);
+
+        // Sphere and triangle intersect if the (squared) distance from sphere
+        // center to point p is less than the (squared) sphere radius
+        v = s - p;
+        return Vector3.Dot(v, v);
+        //return Vector3.Dot(v, v) <= radius * radius;
+    }
+
     public static Vector3 ClosestPtPointTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
     {
         // Check if P in vertex region outside A
@@ -464,7 +476,7 @@ public static class LevelFunctions
 
         StartPosition selectedPosition = positions[randomIndex];
 
-        playerStartPosition = new Vector3(selectedPosition.playerStart.Z, selectedPosition.playerStart.Y + 1.50f, selectedPosition.playerStart.X);
+        playerStartPosition = new Vector3(selectedPosition.playerStart.Z + 0.01f, selectedPosition.playerStart.Y + 1.25f, selectedPosition.playerStart.X);
 
         SectorMeta CurrentSector = sectors[selectedPosition.sectorId];
 
