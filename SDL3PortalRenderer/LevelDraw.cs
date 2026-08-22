@@ -467,6 +467,10 @@ public static class LevelDraw
                 Triangles, Camera3D.ViewProjectionMatrix
             );
 
+            Console.WriteLine(Triangles.Count);
+            Console.WriteLine(CurrentSector.sectorId);
+            Console.WriteLine(SDLPlayerController.Position);
+
             Array.Fill(depthBuffer, float.PositiveInfinity);
 
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -499,13 +503,10 @@ public static class LevelDraw
 
                 float invArea = 1.0f / area;
 
-                float epsilon = 0.5f;
-
-                int xmin = (int)MathF.Floor(MathF.Min(screen0.X, MathF.Min(screen1.X, screen2.X)) - epsilon);
-                int ymin = (int)MathF.Floor(MathF.Min(screen0.Y, MathF.Min(screen1.Y, screen2.Y)) - epsilon);
-
-                int xmax = (int)MathF.Ceiling(MathF.Max(screen0.X, MathF.Max(screen1.X, screen2.X)) + epsilon);
-                int ymax = (int)MathF.Ceiling(MathF.Max(screen0.Y, MathF.Max(screen1.Y, screen2.Y)) + epsilon);
+                int xmin = (int)MathF.Floor(MathF.Min(screen0.X, MathF.Min(screen1.X, screen2.X)));
+                int ymin = (int)MathF.Floor(MathF.Min(screen0.Y, MathF.Min(screen1.Y, screen2.Y)));
+                int xmax = (int)MathF.Ceiling(MathF.Max(screen0.X, MathF.Max(screen1.X, screen2.X)));
+                int ymax = (int)MathF.Ceiling(MathF.Max(screen0.Y, MathF.Max(screen1.Y, screen2.Y)));
 
                 xmin = Math.Clamp(xmin, 0, w - 1);
                 ymin = Math.Clamp(ymin, 0, h - 1);
