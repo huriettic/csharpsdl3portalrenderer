@@ -476,7 +476,7 @@ public static class LevelFunctions
 
         StartPosition selectedPosition = positions[randomIndex];
 
-        playerStartPosition = new Vector3(selectedPosition.playerStart.Z + 0.01f, selectedPosition.playerStart.Y + 1.25f, selectedPosition.playerStart.X);
+        playerStartPosition = new Vector3(selectedPosition.playerStart.Z + 0.01f, selectedPosition.playerStart.Y + 1.25f, selectedPosition.playerStart.X * -1); 
 
         SectorMeta CurrentSector = sectors[selectedPosition.sectorId];
 
@@ -668,10 +668,10 @@ public static class LevelFunctions
 
                 int wall = sector.wallTypes[(e + 1) % sector.wallTypes.Count];
 
-                double X1 = vertices[current].X / 2 * 2.5f;
+                double X1 = vertices[current].X / 2 * 2.5f * -1;
                 double Z1 = vertices[current].Y / 2 * 2.5f;
 
-                double X0 = vertices[next].X / 2 * 2.5f;
+                double X0 = vertices[next].X / 2 * 2.5f * -1;
                 double Z0 = vertices[next].Y / 2 * 2.5f;
 
                 if (wall == -1)
@@ -681,10 +681,10 @@ public static class LevelFunctions
 
                     int baseVert = temporaryVertices.Count;
 
-                    temporaryVertices.Add(new Vector3((float)Z1, (float)V0, (float)X1));
-                    temporaryVertices.Add(new Vector3((float)Z1, (float)V1, (float)X1));
-                    temporaryVertices.Add(new Vector3((float)Z0, (float)V1, (float)X0));
                     temporaryVertices.Add(new Vector3((float)Z0, (float)V0, (float)X0));
+                    temporaryVertices.Add(new Vector3((float)Z0, (float)V1, (float)X0));
+                    temporaryVertices.Add(new Vector3((float)Z1, (float)V1, (float)X1));
+                    temporaryVertices.Add(new Vector3((float)Z1, (float)V0, (float)X1));
 
                     temporaryTriangles.Add(baseVert);
                     temporaryTriangles.Add(baseVert + 1);
@@ -748,10 +748,10 @@ public static class LevelFunctions
 
                             int baseVert = temporaryVertices.Count;
 
-                            temporaryVertices.Add(new Vector3((float)Z1, (float)Ceiling, (float)X1));
-                            temporaryVertices.Add(new Vector3((float)Z1, (float)C0, (float)X1));
-                            temporaryVertices.Add(new Vector3((float)Z0, (float)C0, (float)X0));
                             temporaryVertices.Add(new Vector3((float)Z0, (float)Ceiling, (float)X0));
+                            temporaryVertices.Add(new Vector3((float)Z0, (float)C0, (float)X0));
+                            temporaryVertices.Add(new Vector3((float)Z1, (float)C0, (float)X1));
+                            temporaryVertices.Add(new Vector3((float)Z1, (float)Ceiling, (float)X1));
 
                             temporaryTriangles.Add(baseVert);
                             temporaryTriangles.Add(baseVert + 1);
@@ -802,10 +802,10 @@ public static class LevelFunctions
 
                             int baseVert = temporaryVertices.Count;
 
-                            temporaryVertices.Add(new Vector3((float)Z1, (float)C1, (float)X1));
-                            temporaryVertices.Add(new Vector3((float)Z1, (float)C0, (float)X1));
-                            temporaryVertices.Add(new Vector3((float)Z0, (float)C0, (float)X0));
                             temporaryVertices.Add(new Vector3((float)Z0, (float)C1, (float)X0));
+                            temporaryVertices.Add(new Vector3((float)Z0, (float)C0, (float)X0));
+                            temporaryVertices.Add(new Vector3((float)Z1, (float)C0, (float)X1));
+                            temporaryVertices.Add(new Vector3((float)Z1, (float)C1, (float)X1));
 
                             temporaryTriangles.Add(baseVert);
                             temporaryTriangles.Add(baseVert + 1);
@@ -873,10 +873,10 @@ public static class LevelFunctions
 
                         int baseStartIndex = lines.Count;
 
-                        edges.Add(new Vector3((float)Z1, (float)Floor, (float)X1));
-                        edges.Add(new Vector3((float)Z1, (float)Ceiling, (float)X1));
-                        edges.Add(new Vector3((float)Z0, (float)Ceiling, (float)X0));
                         edges.Add(new Vector3((float)Z0, (float)Floor, (float)X0));
+                        edges.Add(new Vector3((float)Z0, (float)Ceiling, (float)X0));
+                        edges.Add(new Vector3((float)Z1, (float)Ceiling, (float)X1));
+                        edges.Add(new Vector3((float)Z1, (float)Floor, (float)X1));
 
                         lines.Add(baseVert);
                         lines.Add(baseVert + 1);
@@ -942,10 +942,10 @@ public static class LevelFunctions
 
                             int baseVert = temporaryVertices.Count;
 
-                            temporaryVertices.Add(new Vector3((float)Z1, (float)F0, (float)X1));
-                            temporaryVertices.Add(new Vector3((float)Z1, (float)Floor, (float)X1));
-                            temporaryVertices.Add(new Vector3((float)Z0, (float)Floor, (float)X0));
                             temporaryVertices.Add(new Vector3((float)Z0, (float)F0, (float)X0));
+                            temporaryVertices.Add(new Vector3((float)Z0, (float)Floor, (float)X0));
+                            temporaryVertices.Add(new Vector3((float)Z1, (float)Floor, (float)X1));
+                            temporaryVertices.Add(new Vector3((float)Z1, (float)F0, (float)X1));
 
                             temporaryTriangles.Add(baseVert);
                             temporaryTriangles.Add(baseVert + 1);
@@ -996,10 +996,10 @@ public static class LevelFunctions
 
                             int baseVert = temporaryVertices.Count;
 
-                            temporaryVertices.Add(new Vector3((float)Z1, (float)F0, (float)X1));
-                            temporaryVertices.Add(new Vector3((float)Z1, (float)F1, (float)X1));
-                            temporaryVertices.Add(new Vector3((float)Z0, (float)F1, (float)X0));
                             temporaryVertices.Add(new Vector3((float)Z0, (float)F0, (float)X0));
+                            temporaryVertices.Add(new Vector3((float)Z0, (float)F1, (float)X0));
+                            temporaryVertices.Add(new Vector3((float)Z1, (float)F1, (float)X1));
+                            temporaryVertices.Add(new Vector3((float)Z1, (float)F0, (float)X1));
 
                             temporaryTriangles.Add(baseVert);
                             temporaryTriangles.Add(baseVert + 1);
@@ -1060,10 +1060,10 @@ public static class LevelFunctions
                 {
                     double YF = sector.floorHeight / 8 * 2.5f;
                     double YC = sector.ceilingHeight / 8 * 2.5f;
-                    double X = vertices[sector.vertexIndices[e]].X / 2 * 2.5f;
+                    double X = vertices[sector.vertexIndices[e]].X / 2 * 2.5f * -1; 
                     double Z = vertices[sector.vertexIndices[e]].Y / 2 * 2.5f;
 
-                    float OX = (float)X / 2.5f * -1;
+                    float OX = (float)X / 2.5f * -1; 
                     float OY = (float)Z / 2.5f;
 
                     floorVertices.Add(new Vector3((float)Z, (float)YF, (float)X));
@@ -1071,6 +1071,9 @@ public static class LevelFunctions
                     floorTextures.Add(new Vector2(OY, OX));
                     ceilingTextures.Add(new Vector2(OY, OX));
                 }
+
+                floorVertices.Reverse();
+                floorTextures.Reverse();
 
                 floorTriangles.Clear();
 
@@ -1100,9 +1103,6 @@ public static class LevelFunctions
                     floorTriangles.Add(e + 1);
                     floorTriangles.Add(e + 2);
                 }
-
-                ceilingVertices.Reverse();
-                ceilingTextures.Reverse();
 
                 ceilingTriangles.Clear();
 

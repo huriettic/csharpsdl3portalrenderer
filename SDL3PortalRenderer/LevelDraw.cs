@@ -124,7 +124,7 @@ public static class LevelDraw
         public static Vector3 Position = playerStartPosition;
         public static float Speed = 6f;
 
-        public static float Yaw = 180f;
+        public static float Yaw = 0f;
         public static float Pitch = 0f;
 
         public static float MouseSensitivity = 0.1f;
@@ -420,7 +420,9 @@ public static class LevelDraw
             while (SDL_PollEvent(out evt))
             {
                 if (evt.type == (uint)SDL_EventType.SDL_EVENT_QUIT)
+                {
                     running = false;
+                }  
             }
 
             float dt = GetDeltaTime();
@@ -497,10 +499,13 @@ public static class LevelDraw
 
                 float invArea = 1.0f / area;
 
-                int xmin = (int)MathF.Floor(MathF.Min(screen0.X, MathF.Min(screen1.X, screen2.X)));
-                int ymin = (int)MathF.Floor(MathF.Min(screen0.Y, MathF.Min(screen1.Y, screen2.Y)));
-                int xmax = (int)MathF.Ceiling(MathF.Max(screen0.X, MathF.Max(screen1.X, screen2.X)));
-                int ymax = (int)MathF.Ceiling(MathF.Max(screen0.Y, MathF.Max(screen1.Y, screen2.Y)));
+                float epsilon = 0.5f;
+
+                int xmin = (int)MathF.Floor(MathF.Min(screen0.X, MathF.Min(screen1.X, screen2.X)) - epsilon);
+                int ymin = (int)MathF.Floor(MathF.Min(screen0.Y, MathF.Min(screen1.Y, screen2.Y)) - epsilon);
+
+                int xmax = (int)MathF.Ceiling(MathF.Max(screen0.X, MathF.Max(screen1.X, screen2.X)) + epsilon);
+                int ymax = (int)MathF.Ceiling(MathF.Max(screen0.Y, MathF.Max(screen1.Y, screen2.Y)) + epsilon);
 
                 xmin = Math.Clamp(xmin, 0, w - 1);
                 ymin = Math.Clamp(ymin, 0, h - 1);
