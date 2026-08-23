@@ -248,6 +248,12 @@ public static class LevelDraw
         ulong currentCounter = SDL_GetPerformanceCounter();
         float dt = (float)(currentCounter - lastCounter) / frequency;
         lastCounter = currentCounter;
+        
+        //if (dt > 0.016f)
+        //{
+        //    dt = 0.016f;
+        //}
+
         return dt;
     }
 
@@ -313,6 +319,9 @@ public static class LevelDraw
 
     static SectorMeta CurrentSector;
     static Vector3 playerStartPosition;
+
+    static Dictionary<uint, int> colorToBucket = new();
+    static List<List<SDL_FPoint>> colorBuckets = new();
 
     static unsafe void Main(string[] args)
     {
@@ -412,6 +421,19 @@ public static class LevelDraw
 
         SDL_DestroySurface(texture);
 
+        for (int i = 0; i < sampleTexture.Length; i++)
+        {
+            uint col = sampleTexture[i];
+
+            if (!colorToBucket.ContainsKey(col))
+            {
+                colorToBucket[col] = colorBuckets.Count;
+                colorBuckets.Add(new List<SDL_FPoint>());
+            }
+        }
+
+        Console.WriteLine($"Unique texture colors: {colorBuckets.Count}");
+
         bool running = true;
         SDL_Event evt;
 
@@ -478,6 +500,11 @@ public static class LevelDraw
 
             foreach (Triangle tri in Triangles)
             {
+                for (int i = 0; i < colorBuckets.Count; i++)
+                {
+                    colorBuckets[i].Clear();
+                }
+
                 float invw0 = 1.0f / tri.c0.W;
                 float invw1 = 1.0f / tri.c1.W;
                 float invw2 = 1.0f / tri.c2.W;
@@ -494,7 +521,9 @@ public static class LevelDraw
                 Vector2 screen1 = new((tri.c1.X * invw1 * 0.5f + 0.5f) * w, (1.0f - (tri.c1.Y * invw1 * 0.5f + 0.5f)) * h);
                 Vector2 screen2 = new((tri.c2.X * invw2 * 0.5f + 0.5f) * w, (1.0f - (tri.c2.Y * invw2 * 0.5f + 0.5f)) * h);
 
-                float area = (screen0.Y - screen1.Y) * screen2.X + (screen1.X - screen0.X) * screen2.Y + (screen0.X * screen1.Y - screen0.Y * screen1.X);
+                float area = (screen0.Y - screen1.Y) * screen2.X +
+                             (screen1.X - screen0.X) * screen2.Y +
+                             (screen0.X * screen1.Y - screen0.Y * screen1.X);
 
                 if (MathF.Abs(area) < 1e-5f || area > 0f)
                 {
@@ -521,9 +550,17 @@ public static class LevelDraw
                     {
                         float px = x + 0.5f;
 
-                        float edge0 = (screen1.Y - screen2.Y) * px + (screen2.X - screen1.X) * py + (screen1.X * screen2.Y - screen1.Y * screen2.X);
-                        float edge1 = (screen2.Y - screen0.Y) * px + (screen0.X - screen2.X) * py + (screen2.X * screen0.Y - screen2.Y * screen0.X);
-                        float edge2 = (screen0.Y - screen1.Y) * px + (screen1.X - screen0.X) * py + (screen0.X * screen1.Y - screen0.Y * screen1.X);
+                        float edge0 = (screen1.Y - screen2.Y) * px +
+                                      (screen2.X - screen1.X) * py +
+                                      (screen1.X * screen2.Y - screen1.Y * screen2.X);
+
+                        float edge1 = (screen2.Y - screen0.Y) * px +
+                                      (screen0.X - screen2.X) * py +
+                                      (screen2.X * screen0.Y - screen2.Y * screen0.X);
+
+                        float edge2 = (screen0.Y - screen1.Y) * px +
+                                      (screen1.X - screen0.X) * py +
+                                      (screen0.X * screen1.Y - screen0.Y * screen1.X);
 
                         if (edge0 > 0f || edge1 > 0f || edge2 > 0f)
                         {
@@ -540,10 +577,12 @@ public static class LevelDraw
 
                         int zd = y * w + x;
 
-                        if (z >= depthBuffer[zd])
+                        if (z >= depthBuffer[zd]) 
                         {
                             continue;
                         }
+
+                        depthBuffer[zd] = z;
 
                         Vector2 uv = (weight0 * invuv0 + weight1 * invuv1 + weight2 * invuv2) / iweight;
 
@@ -557,17 +596,32 @@ public static class LevelDraw
                         ty = Math.Clamp(ty, 0, texHeight - 1);
 
                         uint col = sampleTexture[ty * texWidth + tx];
+                        int bucketIndex = colorToBucket[col];
 
-                        SDL_SetRenderDrawColor(renderer,
-                            (byte)((col >> 0) & 255),
-                            (byte)((col >> 8) & 255),
-                            (byte)((col >> 16) & 255),
-                            (byte)((col >> 24) & 255));
-
-                        SDL_RenderPoint(renderer, x, y);
-
-                        depthBuffer[zd] = z;
+                        colorBuckets[bucketIndex].Add(new SDL_FPoint { x = x, y = y });
                     }
+                }
+
+                foreach (var color in colorToBucket)
+                {
+                    uint col = color.Key;
+                    int index = color.Value;
+
+                    var pixels = colorBuckets[index];
+
+                    if (pixels.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    SDL_SetRenderDrawColor(renderer,
+                        (byte)((col >> 0) & 255),
+                        (byte)((col >> 8) & 255),
+                        (byte)((col >> 16) & 255),
+                        (byte)((col >> 24) & 255));
+
+                    Span<SDL_FPoint> span = CollectionsMarshal.AsSpan(pixels);
+                    SDL_RenderPoints(renderer, span, span.Length);
                 }
             }
 
