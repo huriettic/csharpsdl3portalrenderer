@@ -26,7 +26,7 @@ Put the assets folder with the exe you build.
 
 
 
-Add a folder named lib then put SDL3.Core.DLL in it and add a reference to it.
+Add a folder named lib then put SDL3.Core.DLL in it.
 
 
 
