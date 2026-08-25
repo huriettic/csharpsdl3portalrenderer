@@ -8,7 +8,7 @@ VisPortals
 
 &#x20;\* The MIT License (MIT)
 
-&#x20;\* 
+&#x20;\*
 
 &#x20;\* Copyright (c) 2016 Bunny83
 
@@ -24,13 +24,13 @@ VisPortals
 
 &#x20;\* furnished to do so, subject to the following conditions:
 
-&#x20;\* 
+&#x20;\*
 
 &#x20;\* The above copyright notice and this permission notice shall be included in
 
 &#x20;\* all copies or substantial portions of the Software.
 
-&#x20;\* 
+&#x20;\*
 
 &#x20;\* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 
@@ -92,7 +92,7 @@ VisPortals
 
 &#x20;\*
 
-&#x20;\* Colin "cryy22" Jackson <c@cryy22.art>
+&#x20;\* Colin "cryy22" Jackson [c@cryy22.art](mailto:c@cryy22.art)
 
 &#x20;\*
 
@@ -104,9 +104,9 @@ SDL3 (Native Library)
 
 
 
-Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
+Copyright (C) 1997-2026 Sam Lantinga [slouken@libsdl.org](mailto:slouken@libsdl.org)
 
-&#x20; 
+&#x20;
 
 This software is provided 'as-is', without any express or implied
 
@@ -122,7 +122,7 @@ including commercial applications, and to alter it and redistribute it
 
 freely, subject to the following restrictions:
 
-&#x20; 
+&#x20;
 
 1\. The origin of this software must not be misrepresented; you must not
 
@@ -130,13 +130,15 @@ freely, subject to the following restrictions:
 
 &#x20;  in a product, an acknowledgment in the product documentation would be
 
-&#x20;  appreciated but is not required. 
+&#x20;  appreciated but is not required.
 
 2\. Altered source versions must be plainly marked as such, and must not be
 
 &#x20;  misrepresented as being the original software.
 
-3\. This notice may not be removed or altered from any source distribution.===============================================================================
+3\. This notice may not be removed or altered from any source distribution.
+
+===============================================================================
 
 Real‑Time Collision Detection (Christer Ericson)
 
