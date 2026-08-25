@@ -6,6 +6,14 @@ A portal renderer made with C# and SDL 3
 
 
 
+Windows Visual Studio project.
+
+
+
+I don't know how to make it cross platform.
+
+
+
 You need SDL3.DLL and SDL3.Core.DLL
 
 
