@@ -34,5 +34,9 @@ Move around with WASD keyboard keys and mouse.
 
 
 
-The story is you are a big fat sphere and you move around a level and can you tell I got the sphere triangle collision working?
+The story is you are a big fat sphere and you move around a level.
+
+
+
+Can you tell I got the sphere triangle collision working?
 
