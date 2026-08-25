@@ -1,5 +1,4 @@
 ﻿using System.Numerics;
-using static LevelDraw;
 
 public struct Triangle
 {
