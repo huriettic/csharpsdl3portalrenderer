@@ -14,15 +14,15 @@ I don't know how to make it cross platform.
 
 
 
-You need SDL3.DLL and SDL3.Core.DLL
+You need SDL3.DLL
+
+
+
+uses SDL3-CS package
 
 
 
 SDL3 - [https://github.com/libsdl-org/SDL](https://github.com/libsdl-org/SDL)
-
-
-
-SDL3-CS - [https://github.com/flibitijibibo/SDL3-CS](https://github.com/flibitijibibo/SDL3-CS)
 
 
 
@@ -31,10 +31,6 @@ Put SDL3.DLL with the exe you build.
 
 
 Put the assets folder with the exe you build.
-
-
-
-Add a folder named lib then put SDL3.Core.DLL in it.
 
 
 

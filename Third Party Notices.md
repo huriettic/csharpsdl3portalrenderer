@@ -50,55 +50,39 @@ VisPortals
 
 ===============================================================================
 
-/\* SDL3-CS - C# Bindings for SDL3
+Copyright (C) 2024-2026 Eduard Gushchin <eduardgushchin@yandex.ru>
 
-&#x20;\*
+&#x20; 
 
-&#x20;\* Copyright (c) 2024 Colin Jackson
+This software is provided 'as-is', without any express or implied
 
-&#x20;\*
+warranty.  In no event will the authors be held liable for any damages
 
-&#x20;\* This software is provided 'as-is', without any express or implied warranty.
+arising from the use of this software.
 
-&#x20;\* In no event will the authors be held liable for any damages arising from
 
-&#x20;\* the use of this software.
 
-&#x20;\*
+Permission is granted to anyone to use this software for any purpose,
 
-&#x20;\* Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
 
-&#x20;\* including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
 
-&#x20;\* freely, subject to the following restrictions:
+&#x20; 
 
-&#x20;\*
+1\. The origin of this software must not be misrepresented; you must not
 
-&#x20;\* 1. The origin of this software must not be misrepresented; you must not
+&#x20;  claim that you wrote the original software. If you use this software
 
-&#x20;\* claim that you wrote the original software. If you use this software in a
+&#x20;  in a product, an acknowledgment in the product documentation would be
 
-&#x20;\* product, an acknowledgment in the product documentation would be
+&#x20;  appreciated but is not required. 
 
-&#x20;\* appreciated but is not required.
+2\. Altered source versions must be plainly marked as such, and must not be
 
-&#x20;\*
+&#x20;  misrepresented as being the original software.
 
-&#x20;\* 2. Altered source versions must be plainly marked as such, and must not be
-
-&#x20;\* misrepresented as being the original software.
-
-&#x20;\*
-
-&#x20;\* 3. This notice may not be removed or altered from any source distribution.
-
-&#x20;\*
-
-&#x20;\* Colin "cryy22" Jackson [c@cryy22.art](mailto:c@cryy22.art)
-
-&#x20;\*
-
-&#x20;\*/
+3\. This notice may not be removed or altered from any source distribution.
 
 ===============================================================================
 
