@@ -114,6 +114,18 @@ public static class LevelFunctions
         return ListOfSectorLists;
     }
 
+    public static List<List<Triangle>> MakeTriangleLists(int tileCount)
+    {
+        List<List<Triangle>> ListOfTriangleLists = new List<List<Triangle>>();
+
+        for (int i = 0; i < tileCount; i++)
+        {
+            ListOfTriangleLists.Add(new List<Triangle>());
+        }
+
+        return ListOfTriangleLists;
+    }
+
     public static int[] contactSectorsMake(List<SectorMeta> sectors)
     {
         int[] contactingSectors = new int[sectors.Count];

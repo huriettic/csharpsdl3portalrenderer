@@ -5,6 +5,75 @@ using static LevelFunctions;
 
 public static class LevelDraw
 {
+    private const int Width = 640;
+    private const int Height = 360;
+    private const int tileSize = 8;
+    private const int tilesX = Width / tileSize;
+    private const int tilesY = Height / tileSize;
+
+    static ulong lastCounter = SDL.GetPerformanceCounter();
+    static ulong frequency = SDL.GetPerformanceFrequency();
+    static float[] depthBuffer = new float[Width * Height];
+    static uint[] backBuffer = new uint[Width * Height];
+    static nint streamingTexture = 0;
+
+    static int texWidth;
+    static int texHeight;
+
+    static List<Vector2> vertices = new();
+    static List<Sector> sectors = new();
+    static List<StartSector> starts = new();
+
+    static double Ceiling;
+    static double Floor;
+    static bool radius;
+    static bool check;
+    static float planeDistance;
+
+    static List<Vector3> temporaryVertices = new();
+    static List<Vector3> temporaryNormals = new();
+    static List<Vector2> temporaryTextures = new();
+    static List<int> temporaryTriangles = new();
+    static List<int> temporaryColors = new();
+
+    static List<Vector3> ceilingVertices = new();
+    static List<int> ceilingTriangles = new();
+    static List<Vector3> floorVertices = new();
+    static List<int> floorTriangles = new();
+    static List<Vector2> floorTextures = new();
+    static List<Vector2> ceilingTextures = new();
+
+    static List<Vector3> OutEdgeVertices = new();
+    static List<Triangle> Triangles = new();
+
+    static bool[] boolEdges = new bool[128];
+    static Vector4[] processEdges = new Vector4[128];
+    static Vector4[] temporaryEdges = new Vector4[128];
+
+    static bool[] processbool = new bool[256];
+    static Vector4[] processvertices = new Vector4[256];
+    static Vector2[] processtextures = new Vector2[256];
+    static Vector3[] processnormals = new Vector3[256];
+    static Vector4[] temporaryvertices = new Vector4[256];
+    static Vector2[] temporarytextures = new Vector2[256];
+    static Vector3[] temporarynormals = new Vector3[256];
+
+    static List<SectorMeta> Sectors = new();
+    static List<List<SectorMeta>> ListOfSectorLists = new();
+    static List<List<Triangle>> ListOfTriangleLists = new();
+    static Tile[] tiles = new Tile[tilesX * tilesY];
+    static Vector4[][] ArrayOfRectangleArrays = Array.Empty<Vector4[]>();
+    static int[] visibleSectors = Array.Empty<int>();
+    static int[] contactingSectors = Array.Empty<int>();
+
+    static Random rng = new();
+
+    static MathematicalPlane LeftPlane;
+    static MathematicalPlane TopPlane;
+
+    static SectorMeta CurrentSector;
+    static Vector3 playerStartPosition;
+
     [Serializable]
     public static class TopLevelLists
     {
@@ -14,12 +83,76 @@ public static class LevelDraw
         public static List<Vector2> textures = new();
         public static List<Vector3> normals = new();
         public static List<int> indices = new();
+        public static List<int> colors = new();
         public static List<MeshMeta> meshes = new();
         public static List<MathematicalPlane> planes = new();
         public static List<PortalMeta> portals = new();
         public static List<ColliderMeta> collision = new();
         public static List<SectorMeta> sectors = new();
         public static List<StartPosition> positions = new();
+    }
+
+    public static void InitializeTiles()
+    {
+        int tilesListCounter = 0;
+
+        for (int y = 0; y < tilesY; y++)
+        {
+            for (int x = 0; x < tilesX; x++)
+            {
+                int index = y * tilesX + x;
+
+                tiles[index] = new Tile
+                {
+                    listOfTriangles = tilesListCounter,
+                    minx = x * 8,
+                    miny = y * 8,
+                    maxx = (x + 1) * 8,
+                    maxy = (y + 1) * 8
+                };
+
+                tilesListCounter += 1;
+            }
+        }
+    }
+
+    public struct Tile
+    {
+        public int listOfTriangles;
+        public int minx;
+        public int miny;
+        public int maxx;
+        public int maxy;
+    };
+
+    public static void BinTriangles(List<Triangle> allTriangles, List<List<Triangle>> listOfTriangleLists)
+    {
+        for (int i = 0; i < listOfTriangleLists.Count; i++)
+        {
+            listOfTriangleLists[i].Clear();
+        }
+
+        for (int i = 0; i < allTriangles.Count; i++)
+        {
+            Triangle tri = allTriangles[i];
+
+            int startTileX = Math.Clamp(tri.xmin / 8, 0, tilesX - 1);
+            int endTileX = Math.Clamp(tri.xmax / 8, 0, tilesX - 1);
+            int startTileY = Math.Clamp(tri.ymin / 8, 0, tilesY - 1);
+            int endTileY = Math.Clamp(tri.ymax / 8, 0, tilesY - 1);
+
+            for (int y = startTileY; y <= endTileY; y++)
+            {
+                for (int x = startTileX; x <= endTileX; x++)
+                {
+                    int tileIndex = y * tilesX + x;
+
+                    int targetListIndex = tiles[tileIndex].listOfTriangles;
+
+                    listOfTriangleLists[targetListIndex].Add(tri);
+                }
+            }
+        }
     }
 
     public static Vector3 CalculateSunDirection(float pitchDegrees, float yawDegrees)
@@ -117,7 +250,10 @@ public static class LevelDraw
 
             for (int a = 0; a < contactingSectors.Length; a++)
             {
-                if (contactingSectors[a] == 0) continue;
+                if (contactingSectors[a] == 0)
+                {
+                    continue;
+                }
 
                 ColliderMeta collide = collision[a];
 
@@ -132,11 +268,26 @@ public static class LevelDraw
 
                     float distSq = TestSphereTriangle(pos, A, B, C, Radius, ref closest, ref diff);
 
-                    if (distSq > Radius * Radius) continue;
+                    if (distSq > Radius * Radius)
+                    {
+                        continue;
+                    }
 
                     float dist = MathF.Sqrt(distSq);
-                    Vector3 normal = (dist > 1e-6f) ? (diff / dist) : Vector3.Normalize(Vector3.Cross(B - A, C - A));
-                    float penetration = (dist > 1e-6f) ? (Radius - dist) : Radius;
+
+                    Vector3 normal;
+                    float penetration;
+
+                    if (dist > 1e-6f)
+                    {
+                        normal = diff / dist;
+                        penetration = Radius - dist;
+                    }
+                    else
+                    {
+                        normal = Vector3.Normalize(Vector3.Cross(B - A, C - A));
+                        penetration = Radius;
+                    }
 
                     pos += normal * penetration;
                 }
@@ -161,71 +312,6 @@ public static class LevelDraw
         return dt;
     }
 
-    static ulong lastCounter = SDL.GetPerformanceCounter();
-    static ulong frequency = SDL.GetPerformanceFrequency();
-
-    static int Width = 640;
-    static int Height = 360;
-
-    static float[] depthBuffer = new float[Width * Height];
-    static uint[] backBuffer = new uint[Width * Height];
-    static nint streamingTexture = 0;
-
-    static int texWidth;
-    static int texHeight;
-
-    static List<Vector2> vertices = new();
-    static List<Sector> sectors = new();
-    static List<StartSector> starts = new();
-
-    static double Ceiling;
-    static double Floor;
-    static bool radius;
-    static bool check;
-    static float planeDistance;
-
-    static List<Vector3> temporaryVertices = new();
-    static List<Vector3> temporaryNormals = new();
-    static List<Vector2> temporaryTextures = new();
-    static List<int> temporaryTriangles = new();
-
-    static List<Vector3> ceilingVertices = new();
-    static List<int> ceilingTriangles = new();
-    static List<Vector3> floorVertices = new();
-    static List<int> floorTriangles = new();
-    static List<Vector2> floorTextures = new();
-    static List<Vector2> ceilingTextures = new();
-
-    static List<Vector3> OutEdgeVertices = new();
-    static List<Triangle> Triangles = new();
-
-    static bool[] boolEdges = new bool[128];
-    static Vector4[] processEdges = new Vector4[128];
-    static Vector4[] temporaryEdges = new Vector4[128];
-
-    static bool[] processbool = new bool[256];
-    static Vector4[] processvertices = new Vector4[256];
-    static Vector2[] processtextures = new Vector2[256];
-    static Vector3[] processnormals = new Vector3[256];
-    static Vector4[] temporaryvertices = new Vector4[256];
-    static Vector2[] temporarytextures = new Vector2[256];
-    static Vector3[] temporarynormals = new Vector3[256];
-
-    static List<SectorMeta> Sectors = new();
-    static List<List<SectorMeta>> ListOfSectorLists = new();
-
-    static Vector4[][] ArrayOfRectangleArrays = Array.Empty<Vector4[]>();
-    static int[] visibleSectors = Array.Empty<int>();
-    static int[] contactingSectors = Array.Empty<int>();
-
-    static Random rng = new();
-
-    static MathematicalPlane LeftPlane;
-    static MathematicalPlane TopPlane;
-
-    static SectorMeta CurrentSector;
-    static Vector3 playerStartPosition;
-
     static void Main(string[] args)
     {
         LoadFromFile("assets/twohallways-clear.txt", vertices, sectors, starts);
@@ -247,7 +333,10 @@ public static class LevelDraw
 
         CurrentSector = PlayerStart(TopLevelLists.positions, TopLevelLists.sectors, rng, ref playerStartPosition);
 
+        InitializeTiles();
+
         ListOfSectorLists = MakeLists();
+        ListOfTriangleLists = MakeTriangleLists(tiles.Length);
         ArrayOfRectangleArrays = ArrayOfArraysMake(TopLevelLists.sectors);
         visibleSectors = VisibleSectorsMake(TopLevelLists.sectors);
         contactingSectors = contactSectorsMake(TopLevelLists.sectors);
@@ -260,7 +349,7 @@ public static class LevelDraw
             return;
         }
 
-        nint window = SDL.CreateWindow("Optimized Software Rasterizer", Width, Height, 0);
+        nint window = SDL.CreateWindow("Software Tile Rasterizer", Width, Height, 0);
         if (window == 0)
         {
             Console.WriteLine("SDL.CreateWindow failed: " + SDL.GetError());
@@ -299,7 +388,10 @@ public static class LevelDraw
             SDLPlayerController.HandleMovement(dt);
             SDLPlayerController.SetCollision(contactingSectors, TopLevelLists.collision, TopLevelLists.vertices, TopLevelLists.indices);
             SDLPlayerController.UpdateCamera();
-            if (SDLPlayerController.QuitRequested) running = false;
+            if (SDLPlayerController.QuitRequested)
+            {
+                running = false;
+            }
             Array.Clear(contactingSectors, 0, contactingSectors.Length);
             CurrentSector = GetSectors(
             CurrentSector, Sectors, ListOfSectorLists, contactingSectors,
@@ -327,47 +419,99 @@ public static class LevelDraw
             );
             Array.Fill(depthBuffer, float.PositiveInfinity);
             Array.Clear(backBuffer, 0, backBuffer.Length);
-            Parallel.ForEach(Triangles, tri =>
+
+            BinTriangles(Triangles, ListOfTriangleLists);
+
+            Parallel.For(0, tiles.Length, tileX =>
             {
-                for (int y = tri.ymin; y <= tri.ymax; y++)
+                Tile tile = tiles[tileX];
+
+                int listBT = tile.listOfTriangles;
+                List<Triangle> binnedTriangles = ListOfTriangleLists[listBT];
+
+                int binnedCount = binnedTriangles.Count;
+                if (binnedCount == 0) 
                 {
-                    float py = y + 0.5f;
-                    int rowOffset = y * Width;
-                    for (int x = tri.xmin; x <= tri.xmax; x++)
+                    return;
+                } 
+
+                int tileMinX = tile.minx;
+                int tileMaxX = tile.maxx;
+                int tileMinY = tile.miny;
+                int tileMaxY = tile.maxy;
+
+                for (int t = 0; t < binnedCount; t++)
+                {
+                    Triangle tri = binnedTriangles[t];
+
+                    int startY = Math.Max(tileMinY, tri.ymin);
+                    int endY = Math.Min(tileMaxY - 1, tri.ymax);
+                    int startX = Math.Max(tileMinX, tri.xmin);
+                    int endX = Math.Min(tileMaxX - 1, tri.xmax);
+
+                    if (startX > endX || startY > endY)
                     {
-                        float px = x + 0.5f;
-                        float edge0 = tri.edgeA0 * px + tri.edgeB0 * py + tri.edgeC0;
-                        float edge1 = tri.edgeA1 * px + tri.edgeB1 * py + tri.edgeC1;
-                        float edge2 = tri.edgeA2 * px + tri.edgeB2 * py + tri.edgeC2;
-                        if (edge0 > 0f || edge1 > 0f || edge2 > 0f) continue;
-                        float weight0 = edge0 * tri.invArea;
-                        float weight1 = edge1 * tri.invArea;
-                        float weight2 = edge2 * tri.invArea;
-                        float iweight = weight0 * tri.invw0 + weight1 * tri.invw1 + weight2 * tri.invw2;
-                        float z = (weight0 * tri.invz0 + weight1 * tri.invz1 + weight2 * tri.invz2) / iweight;
-                        int pixelIdx = rowOffset + x;
-                        if (z >= depthBuffer[pixelIdx]) continue;
-                        depthBuffer[pixelIdx] = z;
-                        Vector3 normal = (weight0 * tri.normal0 * tri.invw0 +
-                        weight1 * tri.normal1 * tri.invw1 +
-                        weight2 * tri.normal2 * tri.invw2) / iweight;
-                        Vector3 N = Vector3.Normalize(normal);
-                        float diffuse = Vector3.Dot(N, lightDir) * 0.5f + 0.5f;
-                        diffuse = MathF.Min(1.0f, (diffuse * diffuse) + 0.2f);
-                        Vector2 uv = (weight0 * tri.invuv0 + weight1 * tri.invuv1 + weight2 * tri.invuv2) / iweight;
-                        float uWrapped = uv.X - MathF.Floor(uv.X);
-                        float vWrapped = uv.Y - MathF.Floor(uv.Y);
-                        int tx = Math.Clamp((int)(uWrapped * (texWidth - 1)), 0, texWidth - 1);
-                        int ty = Math.Clamp((int)(vWrapped * (texHeight - 1)), 0, texHeight - 1);
-                        uint col = sampleTexture[ty * texWidth + tx];
-                        byte r = (byte)Math.Clamp(((col >> 0) & 255) * diffuse, 0, 255);
-                        byte g = (byte)Math.Clamp(((col >> 8) & 255) * diffuse, 0, 255);
-                        byte b = (byte)Math.Clamp(((col >> 16) & 255) * diffuse, 0, 255);
-                        byte a = (byte)((col >> 24) & 255);
-                        backBuffer[pixelIdx] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
+                        continue;
+                    }
+                    for (int y = startY; y <= endY; y++)
+                    {
+                        float py = y + 0.5f;
+                        int rowOffset = y * Width;
+
+                        for (int x = startX; x <= endX; x++)
+                        {
+                            float px = x + 0.5f;
+                            int pixelX = rowOffset + x;
+
+                            float edge0 = tri.edgeA0 * px + tri.edgeB0 * py + tri.edgeC0;
+                            float edge1 = tri.edgeA1 * px + tri.edgeB1 * py + tri.edgeC1;
+                            float edge2 = tri.edgeA2 * px + tri.edgeB2 * py + tri.edgeC2;
+
+                            if (edge0 > 0f || edge1 > 0f || edge2 > 0f) 
+                            {
+                                continue;
+                            }
+
+                            float weight0 = edge0 * tri.invArea;
+                            float weight1 = edge1 * tri.invArea;
+                            float weight2 = edge2 * tri.invArea;
+
+                            float iweight = weight0 * tri.invw0 + weight1 * tri.invw1 + weight2 * tri.invw2;
+                            float z = (weight0 * tri.invz0 + weight1 * tri.invz1 + weight2 * tri.invz2) / iweight;
+
+                            if (z >= depthBuffer[pixelX])
+                            {
+                                continue;
+                            }
+                            depthBuffer[pixelX] = z;
+
+                            Vector3 normal = (weight0 * tri.normal0 * tri.invw0 +
+                                              weight1 * tri.normal1 * tri.invw1 +
+                                              weight2 * tri.normal2 * tri.invw2) / iweight;
+                            Vector3 N = Vector3.Normalize(normal);
+                            float diffuse = Vector3.Dot(N, lightDir) * 0.5f + 0.5f;
+                            diffuse = MathF.Min(1.0f, (diffuse * diffuse) + 0.2f);
+
+                            Vector2 uv = (weight0 * tri.invuv0 + weight1 * tri.invuv1 + weight2 * tri.invuv2) / iweight;
+                            float uWrapped = uv.X - MathF.Floor(uv.X);
+                            float vWrapped = uv.Y - MathF.Floor(uv.Y);
+
+                            int tx = Math.Clamp((int)(uWrapped * (texWidth - 1)), 0, texWidth - 1);
+                            int ty = Math.Clamp((int)(vWrapped * (texHeight - 1)), 0, texHeight - 1);
+
+                            uint col = sampleTexture[ty * texWidth + tx];
+
+                            byte r = (byte)Math.Clamp(((col >> 0) & 255) * diffuse, 0, 255);
+                            byte g = (byte)Math.Clamp(((col >> 8) & 255) * diffuse, 0, 255);
+                            byte b = (byte)Math.Clamp(((col >> 16) & 255) * diffuse, 0, 255);
+                            byte a = (byte)((col >> 24) & 255);
+
+                            backBuffer[pixelX] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
+                        }
                     }
                 }
             });
+
             ReadOnlySpan<byte> pixelBytes = MemoryMarshal.AsBytes(backBuffer.AsSpan());
             SDL.UpdateTexture(streamingTexture, IntPtr.Zero, pixelBytes, Width * sizeof(uint));
             SDL.RenderClear(renderer);
