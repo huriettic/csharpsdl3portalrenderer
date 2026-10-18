@@ -167,7 +167,6 @@ public static class LevelDraw
     static int Width = 640;
     static int Height = 360;
 
-    // --- High-Performance Flat Buffers ---
     static float[] depthBuffer = new float[Width * Height];
     static uint[] backBuffer = new uint[Width * Height];
     static nint streamingTexture = 0;
