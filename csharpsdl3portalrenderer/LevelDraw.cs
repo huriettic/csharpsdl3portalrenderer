@@ -1,7 +1,7 @@
 ﻿using System.Numerics;
 using System.Runtime.InteropServices;
-using static LevelFunctions;
 using SDL3;
+using static LevelFunctions;
 
 public static class LevelDraw
 {
@@ -51,13 +51,9 @@ public static class LevelDraw
         public static void UpdateMatrices()
         {
             Quaternion camRot = Quaternion.CreateFromYawPitchRoll(Rotation.Y, Rotation.X, Rotation.Z);
-
             Matrix4x4 cameraWorld = Matrix4x4.CreateFromQuaternion(camRot) * Matrix4x4.CreateTranslation(Position);
-
             Matrix4x4.Invert(cameraWorld, out ViewMatrix);
-
             ProjectionMatrix = Matrix4x4.CreatePerspectiveFieldOfView(FovRadians, AspectRatio, NearClip, FarClip);
-
             ViewProjectionMatrix = ViewMatrix * ProjectionMatrix;
         }
     }
@@ -85,21 +81,18 @@ public static class LevelDraw
 
             Yaw -= mx * MouseSensitivity;
             Pitch -= my * MouseSensitivity;
-
             Pitch = Math.Clamp(Pitch, -89f, 89f);
 
             float yawRad = Yaw * (MathF.PI / 180f);
             float pitchRad = Pitch * (MathF.PI / 180f);
 
             Vector3 forward = new Vector3(-MathF.Sin(yawRad) * MathF.Cos(pitchRad), MathF.Sin(pitchRad), -MathF.Cos(yawRad) * MathF.Cos(pitchRad));
-
             forward = Vector3.Normalize(forward);
 
             if (keys[(int)SDL.Scancode.W])
             {
                 Position += forward * Speed * dt;
             }
-
             if (keys[(int)SDL.Scancode.S])
             {
                 Position -= forward * Speed * dt;
@@ -111,7 +104,6 @@ public static class LevelDraw
             {
                 Position -= right * Speed * dt;
             }
-
             if (keys[(int)SDL.Scancode.D])
             {
                 Position += right * Speed * dt;
@@ -125,10 +117,7 @@ public static class LevelDraw
 
             for (int a = 0; a < contactingSectors.Length; a++)
             {
-                if (contactingSectors[a] == 0)
-                {
-                    continue;
-                }
+                if (contactingSectors[a] == 0) continue;
 
                 ColliderMeta collide = collision[a];
 
@@ -143,26 +132,11 @@ public static class LevelDraw
 
                     float distSq = TestSphereTriangle(pos, A, B, C, Radius, ref closest, ref diff);
 
-                    if (distSq > Radius * Radius)
-                    {
-                        continue;
-                    }
+                    if (distSq > Radius * Radius) continue;
 
                     float dist = MathF.Sqrt(distSq);
-
-                    Vector3 normal;
-                    float penetration;
-
-                    if (dist > 1e-6f)
-                    {
-                        normal = diff / dist;
-                        penetration = Radius - dist;
-                    }
-                    else
-                    {
-                        normal = Vector3.Normalize(Vector3.Cross(B - A, C - A));
-                        penetration = Radius;
-                    }
+                    Vector3 normal = (dist > 1e-6f) ? (diff / dist) : Vector3.Normalize(Vector3.Cross(B - A, C - A));
+                    float penetration = (dist > 1e-6f) ? (Radius - dist) : Radius;
 
                     pos += normal * penetration;
                 }
@@ -174,7 +148,6 @@ public static class LevelDraw
         public static void UpdateCamera()
         {
             Camera3D.Rotation = new Vector3(Pitch * (MathF.PI / 180f), Yaw * (MathF.PI / 180f), 0f);
-
             Camera3D.Position = new Vector3(Position.X + 0.01f, Position.Y, Position.Z);
             Camera3D.UpdateMatrices();
         }
@@ -185,22 +158,19 @@ public static class LevelDraw
         ulong currentCounter = SDL.GetPerformanceCounter();
         float dt = (float)(currentCounter - lastCounter) / frequency;
         lastCounter = currentCounter;
-        
-        //if (dt > 0.016f)
-        //{
-        //    dt = 0.016f;
-        //}
-
         return dt;
     }
 
     static ulong lastCounter = SDL.GetPerformanceCounter();
     static ulong frequency = SDL.GetPerformanceFrequency();
 
-    static int w = 640;
-    static int h = 360;
+    static int Width = 640;
+    static int Height = 360;
 
-    static float[] depthBuffer = new float[w * h];
+    // --- High-Performance Flat Buffers ---
+    static float[] depthBuffer = new float[Width * Height];
+    static uint[] backBuffer = new uint[Width * Height];
+    static nint streamingTexture = 0;
 
     static int texWidth;
     static int texHeight;
@@ -257,9 +227,6 @@ public static class LevelDraw
     static SectorMeta CurrentSector;
     static Vector3 playerStartPosition;
 
-    static Dictionary<uint, int> colorToBucket = new();
-    static List<List<SDL.FPoint>> colorBuckets = new();
-
     static void Main(string[] args)
     {
         LoadFromFile("assets/twohallways-clear.txt", vertices, sectors, starts);
@@ -294,255 +261,121 @@ public static class LevelDraw
             return;
         }
 
-        nint window = SDL.CreateWindow("SDL3 Window", 0, 0, SDL.WindowFlags.Fullscreen);
-
+        nint window = SDL.CreateWindow("Optimized Software Rasterizer", Width, Height, 0);
         if (window == 0)
         {
-            Console.WriteLine("SDL_CreateWindow failed: " + SDL.GetError());
+            Console.WriteLine("SDL.CreateWindow failed: " + SDL.GetError());
             SDL.Quit();
             return;
         }
-
         nint renderer = SDL.CreateRenderer(window, null);
-
         if (renderer == 0)
         {
-            Console.WriteLine("SDL_CreateRenderer failed: " + SDL.GetError());
+            Console.WriteLine("SDL.CreateRenderer failed: " + SDL.GetError());
             SDL.DestroyWindow(window);
             SDL.Quit();
             return;
         }
-
-        Console.WriteLine("SDL window and renderer created successfully!");
-
-        if (!SDL.SetRenderVSync(renderer, 1))
-        {
-            Console.WriteLine("Could not set VSync! SDL_Error: " + SDL.GetError());
-        }
-
-        if (!SDL.SetRenderLogicalPresentation(renderer, w, h, SDL.RendererLogicalPresentation.IntegerScale))
-        {
-            Console.WriteLine("Could not set logical presentation size! SDL_Error: " + SDL.GetError());
-        }
-
-        if(!SDL.SetWindowRelativeMouseMode(window, true))
-        {
-            Console.WriteLine("Could not set mouse mode! SDL_Error: " + SDL.GetError());
-        }
-
+        streamingTexture = SDL.CreateTexture(renderer, SDL.PixelFormat.ABGR8888, SDL.TextureAccess.Streaming, Width, Height);
+        SDL.SetRenderVSync(renderer, 1);
+        SDL.SetWindowRelativeMouseMode(window, true);
         nint texture = SDL.LoadPNG("assets/texture.png");
-        if (texture == 0)
-        {
-            Console.WriteLine("Failed to load PNG texture: " + SDL.GetError());
-        }
-
         SDL.Surface tex = Marshal.PtrToStructure<SDL.Surface>(texture);
-
-        if (tex.Pixels == IntPtr.Zero)
-        {
-            Console.WriteLine("Surface.pixels is NULL — no pixel data.");
-            return;
-        }
-
         texWidth = tex.Width;
         texHeight = tex.Height;
-
         uint[] sampleTexture = new uint[texWidth * texHeight];
-
         Marshal.Copy(tex.Pixels, (int[])(object)sampleTexture, 0, sampleTexture.Length);
-
-        uint first = sampleTexture[0];
-        Console.WriteLine($"First pixel: 0x{first:X8}");
-
         SDL.DestroySurface(texture);
-
         float sunPitch = 50.0f;
         float sunYaw = -30.0f;
-
         Vector3 lightDir = CalculateSunDirection(sunPitch, sunYaw);
-
         bool running = true;
-
         while (running)
         {
             while (SDL.PollEvent(out var ev))
             {
-                if ((SDL.EventType)ev.Type == SDL.EventType.Quit)
-                {
-                    running = false;
-                }  
+                if ((SDL.EventType)ev.Type == SDL.EventType.Quit) running = false;
             }
-
             float dt = GetDeltaTime();
-
             SDLPlayerController.HandleMovement(dt);
             SDLPlayerController.SetCollision(contactingSectors, TopLevelLists.collision, TopLevelLists.vertices, TopLevelLists.indices);
             SDLPlayerController.UpdateCamera();
-
-            if (SDLPlayerController.QuitRequested)
-            {
-                running = false;
-            }
-
+            if (SDLPlayerController.QuitRequested) running = false;
             Array.Clear(contactingSectors, 0, contactingSectors.Length);
-
-            colorToBucket.Clear();
-            colorBuckets.Clear();
-
             CurrentSector = GetSectors(
-                CurrentSector, Sectors, ListOfSectorLists, contactingSectors,
-                TopLevelLists.portals, TopLevelLists.sectors,
-                Camera3D.Position, radius, check, TopLevelLists.planes
+            CurrentSector, Sectors, ListOfSectorLists, contactingSectors,
+            TopLevelLists.portals, TopLevelLists.sectors,
+            Camera3D.Position, radius, check, TopLevelLists.planes
             );
-
             Array.Clear(visibleSectors, 0, visibleSectors.Length);
-
             GetPortals(
-                CurrentSector, ListOfSectorLists, ArrayOfRectangleArrays, visibleSectors,
-                TopLevelLists.portals, planeDistance, TopLevelLists.planes,
-                TopLevelLists.sectors, Sectors, OutEdgeVertices,
-                Camera3D.Position, Camera3D.ViewProjectionMatrix,
-                TopLevelLists.edges, TopLevelLists.lines,
-                processEdges, temporaryEdges, boolEdges
+            CurrentSector, ListOfSectorLists, ArrayOfRectangleArrays, visibleSectors,
+            TopLevelLists.portals, planeDistance, TopLevelLists.planes,
+            TopLevelLists.sectors, Sectors, OutEdgeVertices,
+            Camera3D.Position, Camera3D.ViewProjectionMatrix,
+            TopLevelLists.edges, TopLevelLists.lines,
+            processEdges, temporaryEdges, boolEdges
             );
-
             Triangles.Clear();
-
             SetTriangles(
-                visibleSectors, TopLevelLists.meshes, ArrayOfRectangleArrays,
-                TopLevelLists.vertices, TopLevelLists.textures, TopLevelLists.normals,
-                TopLevelLists.indices, Camera3D.Position,
-                processbool, processvertices, temporaryvertices,
-                processtextures, temporarytextures,
-                processnormals, temporarynormals,
-                Triangles, Camera3D.ViewProjectionMatrix, w, h
+            visibleSectors, TopLevelLists.meshes, ArrayOfRectangleArrays,
+            TopLevelLists.vertices, TopLevelLists.textures, TopLevelLists.normals,
+            TopLevelLists.indices, Camera3D.Position,
+            processbool, processvertices, temporaryvertices,
+            processtextures, temporarytextures,
+            processnormals, temporarynormals,
+            Triangles, Camera3D.ViewProjectionMatrix, Width, Height
             );
-
-            Console.WriteLine(Triangles.Count);
-            Console.WriteLine(CurrentSector.sectorId);
-            Console.WriteLine(SDLPlayerController.Position);
-
             Array.Fill(depthBuffer, float.PositiveInfinity);
-
-            SDL.SetRenderDrawColor(renderer, 0, 0, 0, 255);
-            SDL.RenderClear(renderer);
-
-            foreach (Triangle tri in Triangles)
+            Array.Clear(backBuffer, 0, backBuffer.Length);
+            Parallel.ForEach(Triangles, tri =>
             {
-                for (int i = 0; i < colorBuckets.Count; i++)
-                {
-                    colorBuckets[i].Clear();
-                }
-
                 for (int y = tri.ymin; y <= tri.ymax; y++)
                 {
                     float py = y + 0.5f;
-
+                    int rowOffset = y * Width;
                     for (int x = tri.xmin; x <= tri.xmax; x++)
                     {
                         float px = x + 0.5f;
-
                         float edge0 = tri.edgeA0 * px + tri.edgeB0 * py + tri.edgeC0;
                         float edge1 = tri.edgeA1 * px + tri.edgeB1 * py + tri.edgeC1;
                         float edge2 = tri.edgeA2 * px + tri.edgeB2 * py + tri.edgeC2;
-
-                        if (edge0 > 0f || edge1 > 0f || edge2 > 0f)
-                        {
-                            continue;
-                        }
-
+                        if (edge0 > 0f || edge1 > 0f || edge2 > 0f) continue;
                         float weight0 = edge0 * tri.invArea;
                         float weight1 = edge1 * tri.invArea;
                         float weight2 = edge2 * tri.invArea;
-
                         float iweight = weight0 * tri.invw0 + weight1 * tri.invw1 + weight2 * tri.invw2;
-
                         float z = (weight0 * tri.invz0 + weight1 * tri.invz1 + weight2 * tri.invz2) / iweight;
-
-                        int zd = y * w + x;
-
-                        if (z >= depthBuffer[zd])
-                        {
-                            continue;
-                        }
-
-                        depthBuffer[zd] = z;
-
+                        int pixelIdx = rowOffset + x;
+                        if (z >= depthBuffer[pixelIdx]) continue;
+                        depthBuffer[pixelIdx] = z;
                         Vector3 normal = (weight0 * tri.normal0 * tri.invw0 +
-                                          weight1 * tri.normal1 * tri.invw1 +
-                                          weight2 * tri.normal2 * tri.invw2) / iweight;
-
+                        weight1 * tri.normal1 * tri.invw1 +
+                        weight2 * tri.normal2 * tri.invw2) / iweight;
                         Vector3 N = Vector3.Normalize(normal);
-
-                        Vector3 L = lightDir;
-
-                        float NdotL = Vector3.Dot(N, L);
-
-                        float diffuse = NdotL * 0.5f + 0.5f;
-
-                        diffuse = diffuse * diffuse;
-
-                        float ambient = 0.2f;
-
-                        diffuse = MathF.Min(1.0f, diffuse + ambient);
-
+                        float diffuse = Vector3.Dot(N, lightDir) * 0.5f + 0.5f;
+                        diffuse = MathF.Min(1.0f, (diffuse * diffuse) + 0.2f);
                         Vector2 uv = (weight0 * tri.invuv0 + weight1 * tri.invuv1 + weight2 * tri.invuv2) / iweight;
-
                         float uWrapped = uv.X - MathF.Floor(uv.X);
                         float vWrapped = uv.Y - MathF.Floor(uv.Y);
-
-                        int tx = (int)(uWrapped * (texWidth - 1));
-                        int ty = (int)(vWrapped * (texHeight - 1));
-
-                        tx = Math.Clamp(tx, 0, texWidth - 1);
-                        ty = Math.Clamp(ty, 0, texHeight - 1);
-
+                        int tx = Math.Clamp((int)(uWrapped * (texWidth - 1)), 0, texWidth - 1);
+                        int ty = Math.Clamp((int)(vWrapped * (texHeight - 1)), 0, texHeight - 1);
                         uint col = sampleTexture[ty * texWidth + tx];
-
                         byte r = (byte)Math.Clamp(((col >> 0) & 255) * diffuse, 0, 255);
                         byte g = (byte)Math.Clamp(((col >> 8) & 255) * diffuse, 0, 255);
                         byte b = (byte)Math.Clamp(((col >> 16) & 255) * diffuse, 0, 255);
                         byte a = (byte)((col >> 24) & 255);
-
-                        uint litColor = (uint)(r | (g << 8) | (b << 16) | (a << 24));
-
-                        if (!colorToBucket.TryGetValue(litColor, out int bucketIndex))
-                        {
-                            bucketIndex = colorBuckets.Count;
-                            colorBuckets.Add(new List<SDL.FPoint>());
-                            colorToBucket[litColor] = bucketIndex;
-                        }
-
-                        colorBuckets[bucketIndex].Add(new SDL.FPoint { X = x, Y = y });
+                        backBuffer[pixelIdx] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
                     }
                 }
-
-                foreach (var color in colorToBucket)
-                {
-                    uint col = color.Key;
-                    int index = color.Value;
-
-                    var pixels = colorBuckets[index];
-
-                    if (pixels.Count == 0)
-                    {
-                        continue;
-                    }
-
-                    SDL.SetRenderDrawColor(renderer,
-                        (byte)((col >> 0) & 255),
-                        (byte)((col >> 8) & 255),
-                        (byte)((col >> 16) & 255),
-                        (byte)((col >> 24) & 255));
-
-                    Span<SDL.FPoint> span = CollectionsMarshal.AsSpan(pixels);
-                    SDL.RenderPoints(renderer, span, span.Length);
-                }
-            }
-
+            });
+            ReadOnlySpan<byte> pixelBytes = MemoryMarshal.AsBytes(backBuffer.AsSpan());
+            SDL.UpdateTexture(streamingTexture, IntPtr.Zero, pixelBytes, Width * sizeof(uint));
+            SDL.RenderClear(renderer);
+            SDL.RenderTexture(renderer, streamingTexture, IntPtr.Zero, IntPtr.Zero);
             SDL.RenderPresent(renderer);
         }
-
+        SDL.DestroyTexture(streamingTexture);
         SDL.DestroyRenderer(renderer);
         SDL.DestroyWindow(window);
         SDL.Quit();
