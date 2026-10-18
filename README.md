@@ -14,7 +14,7 @@ I don't know how to make it cross platform.
 
 
 
-You need SDL3.DLL and it uses the SDL3-CS package.
+You need SDL3.DLL and it uses the SDL3-CS NuGet package.
 
 
 
