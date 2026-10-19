@@ -60,7 +60,7 @@ public static class LevelDraw
 
     static List<SectorMeta> Sectors = new();
     static List<List<SectorMeta>> ListOfSectorLists = new();
-    static List<List<Triangle>> ListOfTriangleLists = new();
+    static List<List<int>> ListOfTriangleLists = new();
     static Tile[] tiles = new Tile[tilesX * tilesY];
     static Vector4[][] ArrayOfRectangleArrays = Array.Empty<Vector4[]>();
     static int[] visibleSectors = Array.Empty<int>();
@@ -125,7 +125,7 @@ public static class LevelDraw
         public int maxy;
     };
 
-    public static void BinTriangles(List<Triangle> allTriangles, List<List<Triangle>> listOfTriangleLists)
+    public static void BinTriangles(List<Triangle> allTriangles, List<List<int>> listOfTriangleLists)
     {
         for (int i = 0; i < listOfTriangleLists.Count; i++)
         {
@@ -141,15 +141,100 @@ public static class LevelDraw
             int startTileY = Math.Clamp(tri.ymin / 8, 0, tilesY - 1);
             int endTileY = Math.Clamp(tri.ymax / 8, 0, tilesY - 1);
 
+            float n0X = tri.edgeA0; float n0Y = tri.edgeB0;
+            float n1X = tri.edgeA1; float n1Y = tri.edgeB1;
+            float n2X = tri.edgeA2; float n2Y = tri.edgeB2;
+
+            float triMin0 = MathF.Min(n0X * tri.screen0.X + n0Y * tri.screen0.Y, n0X * tri.screen2.X + n0Y * tri.screen2.Y);
+            float triMax0 = MathF.Max(n0X * tri.screen0.X + n0Y * tri.screen0.Y, n0X * tri.screen2.X + n0Y * tri.screen2.Y);
+
+            float triMin1 = MathF.Min(n1X * tri.screen1.X + n1Y * tri.screen1.Y, n1X * tri.screen0.X + n1Y * tri.screen0.Y);
+            float triMax1 = MathF.Max(n1X * tri.screen1.X + n1Y * tri.screen1.Y, n1X * tri.screen0.X + n1Y * tri.screen0.Y);
+
+            float triMin2 = MathF.Min(n2X * tri.screen2.X + n2Y * tri.screen2.Y, n2X * tri.screen1.X + n2Y * tri.screen1.Y);
+            float triMax2 = MathF.Max(n2X * tri.screen2.X + n2Y * tri.screen2.Y, n2X * tri.screen1.X + n2Y * tri.screen1.Y);
+
             for (int y = startTileY; y <= endTileY; y++)
             {
                 for (int x = startTileX; x <= endTileX; x++)
                 {
                     int tileIndex = y * tilesX + x;
+                    Tile tile = tiles[tileIndex];
 
-                    int targetListIndex = tiles[tileIndex].listOfTriangles;
+                    float tileMinX = tile.minx;
+                    float tileMinY = tile.miny;
+                    float tileMaxX = tile.maxx;
+                    float tileMaxY = tile.maxy;
 
-                    listOfTriangleLists[targetListIndex].Add(tri);
+                    float e0_c0 = n0X * tileMinX + n0Y * tileMinY + tri.edgeC0;
+                    float e0_c1 = n0X * tileMaxX + n0Y * tileMinY + tri.edgeC0;
+                    float e0_c2 = n0X * tileMinX + n0Y * tileMaxY + tri.edgeC0;
+                    float e0_c3 = n0X * tileMaxX + n0Y * tileMaxY + tri.edgeC0;
+
+                    if (e0_c0 > 0f && e0_c1 > 0f && e0_c2 > 0f && e0_c3 > 0f)
+                    {
+                        continue;
+                    }
+
+                    float e1_c0 = n1X * tileMinX + n1Y * tileMinY + tri.edgeC1;
+                    float e1_c1 = n1X * tileMaxX + n1Y * tileMinY + tri.edgeC1;
+                    float e1_c2 = n1X * tileMinX + n1Y * tileMaxY + tri.edgeC1;
+                    float e1_c3 = n1X * tileMaxX + n1Y * tileMaxY + tri.edgeC1;
+
+                    if (e1_c0 > 0f && e1_c1 > 0f && e1_c2 > 0f && e1_c3 > 0f)
+                    {
+                        continue;
+                    }
+
+                    float e2_c0 = n2X * tileMinX + n2Y * tileMinY + tri.edgeC2;
+                    float e2_c1 = n2X * tileMaxX + n2Y * tileMinY + tri.edgeC2;
+                    float e2_c2 = n2X * tileMinX + n2Y * tileMaxY + tri.edgeC2;
+                    float e2_c3 = n2X * tileMaxX + n2Y * tileMaxY + tri.edgeC2;
+
+                    if (e2_c0 > 0f && e2_c1 > 0f && e2_c2 > 0f && e2_c3 > 0f)
+                    {
+                        continue;
+                    }
+
+                    if (e0_c0 <= 0f && e0_c1 <= 0f && e0_c2 <= 0f && e0_c3 <= 0f &&
+                        e1_c0 <= 0f && e1_c1 <= 0f && e1_c2 <= 0f && e1_c3 <= 0f &&
+                        e2_c0 <= 0f && e2_c1 <= 0f && e2_c2 <= 0f && e2_c3 <= 0f)
+                    {
+                        listOfTriangleLists[tile.listOfTriangles].Add(tri.triangleId);
+                        continue;
+                    }
+
+                    float p00 = e0_c0 - tri.edgeC0; float p01 = e0_c1 - tri.edgeC0;
+                    float p02 = e0_c2 - tri.edgeC0; float p03 = e0_c3 - tri.edgeC0;
+                    float tileMinProj0 = MathF.Min(MathF.Min(p00, p01), MathF.Min(p02, p03));
+                    float tileMaxProj0 = MathF.Max(MathF.Max(p00, p01), MathF.Max(p02, p03));
+
+                    if (tileMaxProj0 < triMin0 || tileMinProj0 > triMax0)
+                    {
+                        continue;
+                    }
+
+                    float p10 = e1_c0 - tri.edgeC1; float p11 = e1_c1 - tri.edgeC1;
+                    float p12 = e1_c2 - tri.edgeC1; float p13 = e1_c3 - tri.edgeC1;
+                    float tileMinProj1 = MathF.Min(MathF.Min(p10, p11), MathF.Min(p12, p13));
+                    float tileMaxProj1 = MathF.Max(MathF.Max(p10, p11), MathF.Max(p12, p13));
+
+                    if (tileMaxProj1 < triMin1 || tileMinProj1 > triMax1)
+                    {
+                        continue;
+                    }
+
+                    float p20 = e2_c0 - tri.edgeC2; float p21 = e2_c1 - tri.edgeC2;
+                    float p22 = e2_c2 - tri.edgeC2; float p23 = e2_c3 - tri.edgeC2;
+                    float tileMinProj2 = MathF.Min(MathF.Min(p20, p21), MathF.Min(p22, p23));
+                    float tileMaxProj2 = MathF.Max(MathF.Max(p20, p21), MathF.Max(p22, p23));
+
+                    if (tileMaxProj2 < triMin2 || tileMinProj2 > triMax2)
+                    {
+                        continue;
+                    }
+
+                    listOfTriangleLists[tile.listOfTriangles].Add(tri.triangleId);
                 }
             }
         }
@@ -427,9 +512,9 @@ public static class LevelDraw
                 Tile tile = tiles[tileX];
 
                 int listBT = tile.listOfTriangles;
-                List<Triangle> binnedTriangles = ListOfTriangleLists[listBT];
+                List<int> binnedTriangleIds = ListOfTriangleLists[listBT];
 
-                int binnedCount = binnedTriangles.Count;
+                int binnedCount = binnedTriangleIds.Count;
                 if (binnedCount == 0) 
                 {
                     return;
@@ -442,7 +527,8 @@ public static class LevelDraw
 
                 for (int t = 0; t < binnedCount; t++)
                 {
-                    Triangle tri = binnedTriangles[t];
+                    int triId = binnedTriangleIds[t];
+                    Triangle tri = Triangles[triId];
 
                     int startY = Math.Max(tileMinY, tri.ymin);
                     int endY = Math.Min(tileMaxY - 1, tri.ymax);

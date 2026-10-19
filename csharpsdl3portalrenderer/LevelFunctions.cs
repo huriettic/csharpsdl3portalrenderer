@@ -15,6 +15,7 @@ public struct Triangle
     public int ymin;
     public int xmax;
     public int ymax;
+    public int triangleId;
 };
 
 [Serializable]
@@ -114,13 +115,13 @@ public static class LevelFunctions
         return ListOfSectorLists;
     }
 
-    public static List<List<Triangle>> MakeTriangleLists(int tileCount)
+    public static List<List<int>> MakeTriangleLists(int tileCount)
     {
-        List<List<Triangle>> ListOfTriangleLists = new List<List<Triangle>>();
+        List<List<int>> ListOfTriangleLists = new List<List<int>>();
 
         for (int i = 0; i < tileCount; i++)
         {
-            ListOfTriangleLists.Add(new List<Triangle>());
+            ListOfTriangleLists.Add(new List<int>());
         }
 
         return ListOfTriangleLists;
@@ -1903,6 +1904,8 @@ public static class LevelFunctions
                         tri.ymin = ymin;
                         tri.xmax = xmax;
                         tri.ymax = ymax;
+
+                        tri.triangleId = triangles.Count;
 
                         triangles.Add(tri);
                     }
