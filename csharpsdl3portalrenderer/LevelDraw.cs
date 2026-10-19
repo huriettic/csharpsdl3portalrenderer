@@ -34,7 +34,6 @@ public static class LevelDraw
     static List<Vector3> temporaryNormals = new();
     static List<Vector2> temporaryTextures = new();
     static List<int> temporaryTriangles = new();
-    static List<int> temporaryColors = new();
 
     static List<Vector3> ceilingVertices = new();
     static List<int> ceilingTriangles = new();
@@ -83,7 +82,6 @@ public static class LevelDraw
         public static List<Vector2> textures = new();
         public static List<Vector3> normals = new();
         public static List<int> indices = new();
-        public static List<int> colors = new();
         public static List<MeshMeta> meshes = new();
         public static List<MathematicalPlane> planes = new();
         public static List<PortalMeta> portals = new();
@@ -115,15 +113,6 @@ public static class LevelDraw
             }
         }
     }
-
-    public struct Tile
-    {
-        public int listOfTriangles;
-        public int minx;
-        public int miny;
-        public int maxx;
-        public int maxy;
-    };
 
     public static void BinTriangles(List<Triangle> allTriangles, List<List<int>> listOfTriangleLists)
     {

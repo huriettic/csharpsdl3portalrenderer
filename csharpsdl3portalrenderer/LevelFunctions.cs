@@ -101,6 +101,15 @@ public struct ColliderMeta
     public int indicesCount;
 };
 
+public struct Tile
+{
+    public int listOfTriangles;
+    public int minx;
+    public int miny;
+    public int maxx;
+    public int maxy;
+};
+
 public static class LevelFunctions
 {
     public static List<List<SectorMeta>> MakeLists()
