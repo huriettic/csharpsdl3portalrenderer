@@ -59,7 +59,7 @@ public static class LevelDraw
 
     static List<SectorMeta> Sectors = new();
     static List<List<SectorMeta>> ListOfSectorLists = new();
-    static List<List<int>> ListOfTriangleLists = new();
+    static List<List<int>> ListOfIntLists = new();
     static Tile[] tiles = new Tile[tilesX * tilesY];
     static Vector4[][] ArrayOfRectangleArrays = Array.Empty<Vector4[]>();
     static int[] visibleSectors = Array.Empty<int>();
@@ -102,7 +102,7 @@ public static class LevelDraw
 
                 tiles[index] = new Tile
                 {
-                    listOfTriangles = tilesListCounter,
+                    listOfInts = tilesListCounter,
                     minx = x * 8,
                     miny = y * 8,
                     maxx = (x + 1) * 8,
@@ -189,7 +189,7 @@ public static class LevelDraw
                         e1_c0 <= 0f && e1_c1 <= 0f && e1_c2 <= 0f && e1_c3 <= 0f &&
                         e2_c0 <= 0f && e2_c1 <= 0f && e2_c2 <= 0f && e2_c3 <= 0f)
                     {
-                        listOfTriangleLists[tile.listOfTriangles].Add(tri.triangleId);
+                        listOfTriangleLists[tile.listOfInts].Add(tri.triangleId);
                         continue;
                     }
 
@@ -223,7 +223,7 @@ public static class LevelDraw
                         continue;
                     }
 
-                    listOfTriangleLists[tile.listOfTriangles].Add(tri.triangleId);
+                    listOfTriangleLists[tile.listOfInts].Add(tri.triangleId);
                 }
             }
         }
@@ -410,7 +410,7 @@ public static class LevelDraw
         InitializeTiles();
 
         ListOfSectorLists = MakeLists();
-        ListOfTriangleLists = MakeTriangleLists(tiles.Length);
+        ListOfIntLists = MakeIntLists(tiles.Length);
         ArrayOfRectangleArrays = ArrayOfArraysMake(TopLevelLists.sectors);
         visibleSectors = VisibleSectorsMake(TopLevelLists.sectors);
         contactingSectors = contactSectorsMake(TopLevelLists.sectors);
@@ -494,14 +494,14 @@ public static class LevelDraw
             Array.Fill(depthBuffer, float.PositiveInfinity);
             Array.Clear(backBuffer, 0, backBuffer.Length);
 
-            BinTriangles(Triangles, ListOfTriangleLists);
+            BinTriangles(Triangles, ListOfIntLists);
 
             Parallel.For(0, tiles.Length, tileX =>
             {
                 Tile tile = tiles[tileX];
 
-                int listBT = tile.listOfTriangles;
-                List<int> binnedTriangleIds = ListOfTriangleLists[listBT];
+                int intsList = tile.listOfInts;
+                List<int> binnedTriangleIds = ListOfIntLists[intsList];
 
                 int binnedCount = binnedTriangleIds.Count;
                 if (binnedCount == 0) 

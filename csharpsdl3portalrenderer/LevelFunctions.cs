@@ -103,7 +103,7 @@ public struct ColliderMeta
 
 public struct Tile
 {
-    public int listOfTriangles;
+    public int listOfInts;
     public int minx;
     public int miny;
     public int maxx;
@@ -124,16 +124,16 @@ public static class LevelFunctions
         return ListOfSectorLists;
     }
 
-    public static List<List<int>> MakeTriangleLists(int tileCount)
+    public static List<List<int>> MakeIntLists(int tileCount)
     {
-        List<List<int>> ListOfTriangleLists = new List<List<int>>();
+        List<List<int>> ListOfIntLists = new List<List<int>>();
 
         for (int i = 0; i < tileCount; i++)
         {
-            ListOfTriangleLists.Add(new List<int>());
+            ListOfIntLists.Add(new List<int>());
         }
 
-        return ListOfTriangleLists;
+        return ListOfIntLists;
     }
 
     public static int[] contactSectorsMake(List<SectorMeta> sectors)
