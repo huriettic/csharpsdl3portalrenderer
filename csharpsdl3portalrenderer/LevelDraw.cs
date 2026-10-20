@@ -7,9 +7,10 @@ public static class LevelDraw
 {
     private const int Width = 640;
     private const int Height = 360;
-    private const int tileSize = 8;
-    private const int tilesX = Width / tileSize;
-    private const int tilesY = Height / tileSize;
+    private const int tileSizeX = 8;
+    private const int tileSizeY = 8;
+    private const int tilesX = Width / tileSizeX;
+    private const int tilesY = Height / tileSizeY;
 
     static ulong lastCounter = SDL.GetPerformanceCounter();
     static ulong frequency = SDL.GetPerformanceFrequency();
@@ -19,6 +20,8 @@ public static class LevelDraw
 
     static int texWidth;
     static int texHeight;
+    static int maskX;
+    static int maskY;
 
     static List<Vector2> vertices = new();
     static List<Sector> sectors = new();
@@ -88,157 +91,6 @@ public static class LevelDraw
         public static List<ColliderMeta> collision = new();
         public static List<SectorMeta> sectors = new();
         public static List<StartPosition> positions = new();
-    }
-
-    public static void InitializeTiles()
-    {
-        int tilesListCounter = 0;
-
-        for (int y = 0; y < tilesY; y++)
-        {
-            for (int x = 0; x < tilesX; x++)
-            {
-                int index = y * tilesX + x;
-
-                tiles[index] = new Tile
-                {
-                    listOfInts = tilesListCounter,
-                    minx = x * 8,
-                    miny = y * 8,
-                    maxx = (x + 1) * 8,
-                    maxy = (y + 1) * 8
-                };
-
-                tilesListCounter += 1;
-            }
-        }
-    }
-
-    public static void BinTriangles(List<Triangle> allTriangles, List<List<int>> listOfTriangleLists)
-    {
-        for (int i = 0; i < listOfTriangleLists.Count; i++)
-        {
-            listOfTriangleLists[i].Clear();
-        }
-
-        for (int i = 0; i < allTriangles.Count; i++)
-        {
-            Triangle tri = allTriangles[i];
-
-            int startTileX = Math.Clamp(tri.xmin / 8, 0, tilesX - 1);
-            int endTileX = Math.Clamp(tri.xmax / 8, 0, tilesX - 1);
-            int startTileY = Math.Clamp(tri.ymin / 8, 0, tilesY - 1);
-            int endTileY = Math.Clamp(tri.ymax / 8, 0, tilesY - 1);
-
-            float n0X = tri.edgeA0; float n0Y = tri.edgeB0;
-            float n1X = tri.edgeA1; float n1Y = tri.edgeB1;
-            float n2X = tri.edgeA2; float n2Y = tri.edgeB2;
-
-            float triMin0 = MathF.Min(n0X * tri.screen0.X + n0Y * tri.screen0.Y, n0X * tri.screen2.X + n0Y * tri.screen2.Y);
-            float triMax0 = MathF.Max(n0X * tri.screen0.X + n0Y * tri.screen0.Y, n0X * tri.screen2.X + n0Y * tri.screen2.Y);
-
-            float triMin1 = MathF.Min(n1X * tri.screen1.X + n1Y * tri.screen1.Y, n1X * tri.screen0.X + n1Y * tri.screen0.Y);
-            float triMax1 = MathF.Max(n1X * tri.screen1.X + n1Y * tri.screen1.Y, n1X * tri.screen0.X + n1Y * tri.screen0.Y);
-
-            float triMin2 = MathF.Min(n2X * tri.screen2.X + n2Y * tri.screen2.Y, n2X * tri.screen1.X + n2Y * tri.screen1.Y);
-            float triMax2 = MathF.Max(n2X * tri.screen2.X + n2Y * tri.screen2.Y, n2X * tri.screen1.X + n2Y * tri.screen1.Y);
-
-            for (int y = startTileY; y <= endTileY; y++)
-            {
-                for (int x = startTileX; x <= endTileX; x++)
-                {
-                    int tileIndex = y * tilesX + x;
-                    Tile tile = tiles[tileIndex];
-
-                    float tileMinX = tile.minx;
-                    float tileMinY = tile.miny;
-                    float tileMaxX = tile.maxx;
-                    float tileMaxY = tile.maxy;
-
-                    float e0_c0 = n0X * tileMinX + n0Y * tileMinY + tri.edgeC0;
-                    float e0_c1 = n0X * tileMaxX + n0Y * tileMinY + tri.edgeC0;
-                    float e0_c2 = n0X * tileMinX + n0Y * tileMaxY + tri.edgeC0;
-                    float e0_c3 = n0X * tileMaxX + n0Y * tileMaxY + tri.edgeC0;
-
-                    if (e0_c0 > 0f && e0_c1 > 0f && e0_c2 > 0f && e0_c3 > 0f)
-                    {
-                        continue;
-                    }
-
-                    float e1_c0 = n1X * tileMinX + n1Y * tileMinY + tri.edgeC1;
-                    float e1_c1 = n1X * tileMaxX + n1Y * tileMinY + tri.edgeC1;
-                    float e1_c2 = n1X * tileMinX + n1Y * tileMaxY + tri.edgeC1;
-                    float e1_c3 = n1X * tileMaxX + n1Y * tileMaxY + tri.edgeC1;
-
-                    if (e1_c0 > 0f && e1_c1 > 0f && e1_c2 > 0f && e1_c3 > 0f)
-                    {
-                        continue;
-                    }
-
-                    float e2_c0 = n2X * tileMinX + n2Y * tileMinY + tri.edgeC2;
-                    float e2_c1 = n2X * tileMaxX + n2Y * tileMinY + tri.edgeC2;
-                    float e2_c2 = n2X * tileMinX + n2Y * tileMaxY + tri.edgeC2;
-                    float e2_c3 = n2X * tileMaxX + n2Y * tileMaxY + tri.edgeC2;
-
-                    if (e2_c0 > 0f && e2_c1 > 0f && e2_c2 > 0f && e2_c3 > 0f)
-                    {
-                        continue;
-                    }
-
-                    if (e0_c0 <= 0f && e0_c1 <= 0f && e0_c2 <= 0f && e0_c3 <= 0f &&
-                        e1_c0 <= 0f && e1_c1 <= 0f && e1_c2 <= 0f && e1_c3 <= 0f &&
-                        e2_c0 <= 0f && e2_c1 <= 0f && e2_c2 <= 0f && e2_c3 <= 0f)
-                    {
-                        listOfTriangleLists[tile.listOfInts].Add(tri.triangleId);
-                        continue;
-                    }
-
-                    float p00 = e0_c0 - tri.edgeC0; float p01 = e0_c1 - tri.edgeC0;
-                    float p02 = e0_c2 - tri.edgeC0; float p03 = e0_c3 - tri.edgeC0;
-                    float tileMinProj0 = MathF.Min(MathF.Min(p00, p01), MathF.Min(p02, p03));
-                    float tileMaxProj0 = MathF.Max(MathF.Max(p00, p01), MathF.Max(p02, p03));
-
-                    if (tileMaxProj0 < triMin0 || tileMinProj0 > triMax0)
-                    {
-                        continue;
-                    }
-
-                    float p10 = e1_c0 - tri.edgeC1; float p11 = e1_c1 - tri.edgeC1;
-                    float p12 = e1_c2 - tri.edgeC1; float p13 = e1_c3 - tri.edgeC1;
-                    float tileMinProj1 = MathF.Min(MathF.Min(p10, p11), MathF.Min(p12, p13));
-                    float tileMaxProj1 = MathF.Max(MathF.Max(p10, p11), MathF.Max(p12, p13));
-
-                    if (tileMaxProj1 < triMin1 || tileMinProj1 > triMax1)
-                    {
-                        continue;
-                    }
-
-                    float p20 = e2_c0 - tri.edgeC2; float p21 = e2_c1 - tri.edgeC2;
-                    float p22 = e2_c2 - tri.edgeC2; float p23 = e2_c3 - tri.edgeC2;
-                    float tileMinProj2 = MathF.Min(MathF.Min(p20, p21), MathF.Min(p22, p23));
-                    float tileMaxProj2 = MathF.Max(MathF.Max(p20, p21), MathF.Max(p22, p23));
-
-                    if (tileMaxProj2 < triMin2 || tileMinProj2 > triMax2)
-                    {
-                        continue;
-                    }
-
-                    listOfTriangleLists[tile.listOfInts].Add(tri.triangleId);
-                }
-            }
-        }
-    }
-
-    public static Vector3 CalculateSunDirection(float pitchDegrees, float yawDegrees)
-    {
-        float pitchRad = pitchDegrees * MathF.PI / 180.0f;
-        float yawRad = yawDegrees * MathF.PI / 180.0f;
-
-        float x = -MathF.Cos(pitchRad) * MathF.Sin(yawRad);
-        float y = MathF.Sin(pitchRad);
-        float z = -MathF.Cos(pitchRad) * MathF.Cos(yawRad);
-
-        return Vector3.Normalize(new Vector3(x, y, z));
     }
 
     public static class Camera3D
@@ -407,7 +259,7 @@ public static class LevelDraw
 
         CurrentSector = PlayerStart(TopLevelLists.positions, TopLevelLists.sectors, rng, ref playerStartPosition);
 
-        InitializeTiles();
+        InitializeTiles(tilesX, tilesY, tiles);
 
         ListOfSectorLists = MakeLists();
         ListOfIntLists = MakeIntLists(tiles.Length);
@@ -445,6 +297,8 @@ public static class LevelDraw
         SDL.Surface tex = Marshal.PtrToStructure<SDL.Surface>(texture);
         texWidth = tex.Width;
         texHeight = tex.Height;
+        maskX = texWidth - 1;
+        maskY = texHeight - 1;
         uint[] sampleTexture = new uint[texWidth * texHeight];
         Marshal.Copy(tex.Pixels, (int[])(object)sampleTexture, 0, sampleTexture.Length);
         SDL.DestroySurface(texture);
@@ -482,6 +336,10 @@ public static class LevelDraw
             processEdges, temporaryEdges, boolEdges
             );
             Triangles.Clear();
+            for (int i = 0; i < ListOfIntLists.Count; i++)
+            {
+                ListOfIntLists[i].Clear();
+            }
             SetTriangles(
             visibleSectors, TopLevelLists.meshes, ArrayOfRectangleArrays,
             TopLevelLists.vertices, TopLevelLists.textures, TopLevelLists.normals,
@@ -489,12 +347,10 @@ public static class LevelDraw
             processbool, processvertices, temporaryvertices,
             processtextures, temporarytextures,
             processnormals, temporarynormals,
-            Triangles, Camera3D.ViewProjectionMatrix, Width, Height
+            Triangles, Camera3D.ViewProjectionMatrix, Width, Height, ListOfIntLists, tiles, tilesX, tilesY
             );
             Array.Fill(depthBuffer, float.PositiveInfinity);
             Array.Clear(backBuffer, 0, backBuffer.Length);
-
-            BinTriangles(Triangles, ListOfIntLists);
 
             Parallel.For(0, tiles.Length, tileX =>
             {
@@ -552,7 +408,10 @@ public static class LevelDraw
                             float weight2 = edge2 * tri.invArea;
 
                             float iweight = weight0 * tri.invw0 + weight1 * tri.invw1 + weight2 * tri.invw2;
-                            float z = (weight0 * tri.invz0 + weight1 * tri.invz1 + weight2 * tri.invz2) / iweight;
+
+                            float invWeight = 1.0f / iweight;
+
+                            float z = (weight0 * tri.invz0 + weight1 * tri.invz1 + weight2 * tri.invz2) * invWeight;
 
                             if (z >= depthBuffer[pixelX])
                             {
@@ -562,17 +421,18 @@ public static class LevelDraw
 
                             Vector3 normal = (weight0 * tri.normal0 * tri.invw0 +
                                               weight1 * tri.normal1 * tri.invw1 +
-                                              weight2 * tri.normal2 * tri.invw2) / iweight;
+                                              weight2 * tri.normal2 * tri.invw2) * invWeight;
                             Vector3 N = Vector3.Normalize(normal);
                             float diffuse = Vector3.Dot(N, lightDir) * 0.5f + 0.5f;
                             diffuse = MathF.Min(1.0f, (diffuse * diffuse) + 0.2f);
 
-                            Vector2 uv = (weight0 * tri.invuv0 + weight1 * tri.invuv1 + weight2 * tri.invuv2) / iweight;
-                            float uWrapped = uv.X - MathF.Floor(uv.X);
-                            float vWrapped = uv.Y - MathF.Floor(uv.Y);
+                            Vector2 uv = (weight0 * tri.invuv0 + weight1 * tri.invuv1 + weight2 * tri.invuv2) * invWeight;
 
-                            int tx = Math.Clamp((int)(uWrapped * (texWidth - 1)), 0, texWidth - 1);
-                            int ty = Math.Clamp((int)(vWrapped * (texHeight - 1)), 0, texHeight - 1);
+                            float texX = uv.X * texWidth;
+                            float texY = uv.Y * texHeight;
+
+                            int tx = ((int)texX - (texX < 0 ? 1 : 0)) & maskX;
+                            int ty = ((int)texY - (texY < 0 ? 1 : 0)) & maskY;
 
                             uint col = sampleTexture[ty * texWidth + tx];
 

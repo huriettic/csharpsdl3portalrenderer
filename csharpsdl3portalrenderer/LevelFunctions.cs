@@ -112,6 +112,42 @@ public struct Tile
 
 public static class LevelFunctions
 {
+    public static void InitializeTiles(int tilesX, int tilesY, Tile[] tiles)
+    {
+        int tilesListCounter = 0;
+
+        for (int y = 0; y < tilesY; y++)
+        {
+            for (int x = 0; x < tilesX; x++)
+            {
+                int index = y * tilesX + x;
+
+                tiles[index] = new Tile
+                {
+                    listOfInts = tilesListCounter,
+                    minx = x * 8,
+                    miny = y * 8,
+                    maxx = (x + 1) * 8,
+                    maxy = (y + 1) * 8
+                };
+
+                tilesListCounter += 1;
+            }
+        }
+    }
+
+    public static Vector3 CalculateSunDirection(float pitchDegrees, float yawDegrees)
+    {
+        float pitchRad = pitchDegrees * MathF.PI / 180.0f;
+        float yawRad = yawDegrees * MathF.PI / 180.0f;
+
+        float x = -MathF.Cos(pitchRad) * MathF.Sin(yawRad);
+        float y = MathF.Sin(pitchRad);
+        float z = -MathF.Cos(pitchRad) * MathF.Cos(yawRad);
+
+        return Vector3.Normalize(new Vector3(x, y, z));
+    }
+
     public static List<List<SectorMeta>> MakeLists()
     {
         List<List<SectorMeta>> ListOfSectorLists = new List<List<SectorMeta>>();
@@ -293,7 +329,7 @@ public static class LevelFunctions
         }
     }
 
-    public static void SetTriangles(int[] visibleSectors, List<MeshMeta> meshes, Vector4[][] ArrayOfRectangleArrays, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height)
+    public static void SetTriangles(int[] visibleSectors, List<MeshMeta> meshes, Vector4[][] ArrayOfRectangleArrays, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, List<List<int>> listOfIntLists, Tile[] tiles, int tilesX, int tilesY)
     {
         for (int a = 0; a < visibleSectors.Length; a++)
         {
@@ -308,7 +344,7 @@ public static class LevelFunctions
 
             Vector4[] rectanglesArray = ArrayOfRectangleArrays[a];
 
-            ClipTrianglesWithRectangles(count, rectanglesArray, mesh, vertices, textures, normals, indices, CamPosition, processbool, processvertices, temporaryvertices, processtextures, temporarytextures, processnormals, temporarynormals, triangles, CamViewProj, Width, Height);
+            ClipTrianglesWithRectangles(count, rectanglesArray, mesh, vertices, textures, normals, indices, CamPosition, processbool, processvertices, temporaryvertices, processtextures, temporarytextures, processnormals, temporarynormals, triangles, CamViewProj, Width, Height, listOfIntLists, tiles, tilesX, tilesY);
         }
     }
 
@@ -323,7 +359,6 @@ public static class LevelFunctions
     {
         return r.X >= r.Z || r.Y >= r.W || (r.Z - r.X) < 0.001f || (r.W - r.Y) < 0.001f;
     }
-
 
     public static bool CheckRadius(SectorMeta asector, Vector3 campoint, List<MathematicalPlane> planes)
     {
@@ -507,7 +542,7 @@ public static class LevelFunctions
 
         StartPosition selectedPosition = positions[randomIndex];
 
-        playerStartPosition = new Vector3(selectedPosition.playerStart.Z, selectedPosition.playerStart.Y + 1.25f, -selectedPosition.playerStart.X); 
+        playerStartPosition = new Vector3(selectedPosition.playerStart.Z, selectedPosition.playerStart.Y + 1.25f, -selectedPosition.playerStart.X);
 
         SectorMeta CurrentSector = sectors[selectedPosition.sectorId];
 
@@ -1091,7 +1126,7 @@ public static class LevelFunctions
                 {
                     double YF = sector.floorHeight / 8 * 2.5f;
                     double YC = sector.ceilingHeight / 8 * 2.5f;
-                    double X = -vertices[sector.vertexIndices[e]].X / 2 * 2.5f; 
+                    double X = -vertices[sector.vertexIndices[e]].X / 2 * 2.5f;
                     double Z = vertices[sector.vertexIndices[e]].Y / 2 * 2.5f;
 
                     float OX = -(float)X / 2.5f;
@@ -1325,7 +1360,7 @@ public static class LevelFunctions
             processboolcount += 2;
         }
 
-        for (int b = 0; b < 6; b++)
+        for (int b = 0; b < 2; b++)
         {
             int intersection = 0;
 
@@ -1344,41 +1379,16 @@ public static class LevelFunctions
                 Vector4 v0 = processEdges[c];
                 Vector4 v1 = processEdges[c + 1];
 
-                float minX = rectangle.X;
-                float minY = rectangle.Y;
-                float maxX = rectangle.Z;
-                float maxY = rectangle.W;
-
                 float d0, d1;
 
                 switch (b)
                 {
-                    case 0: // Left
-                        d0 = v0.X - minX * v0.W;
-                        d1 = v1.X - minX * v1.W;
-                        break;
-
-                    case 1: // Right
-                        d0 = maxX * v0.W - v0.X;
-                        d1 = maxX * v1.W - v1.X;
-                        break;
-
-                    case 2: // Bottom
-                        d0 = v0.Y - minY * v0.W;
-                        d1 = v1.Y - minY * v1.W;
-                        break;
-
-                    case 3: // Top
-                        d0 = maxY * v0.W - v0.Y;
-                        d1 = maxY * v1.W - v1.Y;
-                        break;
-
-                    case 4: // Near
+                    case 0: // Near
                         d0 = v0.Z;
                         d1 = v1.Z;
                         break;
 
-                    case 5: // Far
+                    case 1: // Far
                         d0 = v0.W - v0.Z;
                         d1 = v1.W - v1.Z;
                         break;
@@ -1480,36 +1490,51 @@ public static class LevelFunctions
         float xmax = float.NegativeInfinity;
         float ymax = float.NegativeInfinity;
 
-        for (int i = 0; i < OutEdgeVertices.Count; i++)
+        int count = OutEdgeVertices.Count;
+
+        for (int i = 0; i < count; i++)
         {
             Vector3 ndc = OutEdgeVertices[i];
 
-            if (ndc.X < xmin)
-            {
-                xmin = ndc.X;
-            }
-            if (ndc.X > xmax)
-            {
-                xmax = ndc.X;
-            }
-            if (ndc.Y < ymin)
-            {
-                ymin = ndc.Y;
-            }
-            if (ndc.Y > ymax)
-            {
-                ymax = ndc.Y;
-            }
+            xmin = MathF.Min(xmin, ndc.X);
+            xmax = MathF.Max(xmax, ndc.X);
+            ymin = MathF.Min(ymin, ndc.Y);
+            ymax = MathF.Max(ymax, ndc.Y);
         }
 
-        return new Vector4(xmin, ymin, xmax, ymax);
+        float finalXmin = MathF.Max(xmin, rectangle.X);
+        float finalYmin = MathF.Max(ymin, rectangle.Y);
+        float finalXmax = MathF.Min(xmax, rectangle.Z);
+        float finalYmax = MathF.Min(ymax, rectangle.W);
+
+        if (finalXmin >= finalXmax || finalYmin >= finalYmax)
+        {
+            return Vector4.Zero;
+        }
+
+        return new Vector4(finalXmin, finalYmin, finalXmax, finalYmax);
     }
 
-    public static void ClipTrianglesWithRectangles(int count, Vector4[] rectangles, MeshMeta world, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height)
+    public static void ClipTrianglesWithRectangles(int count, Vector4[] rectangles, MeshMeta world, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, List<List<int>> listOfIntLists, Tile[] tiles, int tilesX, int tilesY)
     {
         for (int i = 0; i < count; i++)
         {
             Vector4 rectangle = rectangles[i];
+
+            int portalXmin = (int)MathF.Floor((rectangle.X * 0.5f + 0.5f) * Width);
+            int portalYmin = (int)MathF.Floor((1.0f - (rectangle.W * 0.5f + 0.5f)) * Height);
+            int portalXmax = (int)MathF.Ceiling((rectangle.Z * 0.5f + 0.5f) * Width);
+            int portalYmax = (int)MathF.Ceiling((1.0f - (rectangle.Y * 0.5f + 0.5f)) * Height);
+
+            portalXmin = Math.Clamp(portalXmin, 0, Width - 1);
+            portalYmin = Math.Clamp(portalYmin, 0, Height - 1);
+            portalXmax = Math.Clamp(portalXmax, 0, Width - 1);
+            portalYmax = Math.Clamp(portalYmax, 0, Height - 1);
+
+            if (portalXmin >= portalXmax || portalYmin >= portalYmax)
+            {
+                continue;
+            }
 
             for (int a = world.indicesStartIndex; a < world.indicesStartIndex + world.indicesCount; a += 3)
             {
@@ -1554,7 +1579,7 @@ public static class LevelFunctions
                 processbool[processboolcount + 2] = true;
                 processboolcount += 3;
 
-                for (int b = 0; b < 6; b++)
+                for (int b = 0; b < 2; b++)
                 {
                     int AddTriangles = 0;
 
@@ -1581,46 +1606,17 @@ public static class LevelFunctions
                         Vector3 n1 = processnormals[c + 1];
                         Vector3 n2 = processnormals[c + 2];
 
-                        float minX = rectangle.X;
-                        float minY = rectangle.Y;
-                        float maxX = rectangle.Z;
-                        float maxY = rectangle.W;
-
                         float d0, d1, d2;
 
                         switch (b)
                         {
-                            case 0: // Left
-                                d0 = v0.X - minX * v0.W;
-                                d1 = v1.X - minX * v1.W;
-                                d2 = v2.X - minX * v2.W;
-                                break;
-
-                            case 1: // Right
-                                d0 = maxX * v0.W - v0.X;
-                                d1 = maxX * v1.W - v1.X;
-                                d2 = maxX * v2.W - v2.X;
-                                break;
-
-                            case 2: // Bottom
-                                d0 = v0.Y - minY * v0.W;
-                                d1 = v1.Y - minY * v1.W;
-                                d2 = v2.Y - minY * v2.W;
-                                break;
-
-                            case 3: // Top
-                                d0 = maxY * v0.W - v0.Y;
-                                d1 = maxY * v1.W - v1.Y;
-                                d2 = maxY * v2.W - v2.Y;
-                                break;
-
-                            case 4: // Near
+                            case 0: // Near
                                 d0 = v0.Z;
                                 d1 = v1.Z;
                                 d2 = v2.Z;
                                 break;
 
-                            case 5: // Far
+                            case 1: // Far
                                 d0 = v0.W - v0.Z;
                                 d1 = v1.W - v1.Z;
                                 d2 = v2.W - v2.Z;
@@ -1865,15 +1861,20 @@ public static class LevelFunctions
                             continue;
                         }
 
-                        int xmin = (int)MathF.Floor(MathF.Min(screen0.X, MathF.Min(screen1.X, screen2.X)));
-                        int ymin = (int)MathF.Floor(MathF.Min(screen0.Y, MathF.Min(screen1.Y, screen2.Y)));
-                        int xmax = (int)MathF.Ceiling(MathF.Max(screen0.X, MathF.Max(screen1.X, screen2.X)));
-                        int ymax = (int)MathF.Ceiling(MathF.Max(screen0.Y, MathF.Max(screen1.Y, screen2.Y)));
+                        int triXmin = (int)MathF.Floor(MathF.Min(screen0.X, MathF.Min(screen1.X, screen2.X)));
+                        int triYmin = (int)MathF.Floor(MathF.Min(screen0.Y, MathF.Min(screen1.Y, screen2.Y)));
+                        int triXmax = (int)MathF.Ceiling(MathF.Max(screen0.X, MathF.Max(screen1.X, screen2.X)));
+                        int triYmax = (int)MathF.Ceiling(MathF.Max(screen0.Y, MathF.Max(screen1.Y, screen2.Y)));
 
-                        xmin = Math.Clamp(xmin, 0, Width - 1);
-                        ymin = Math.Clamp(ymin, 0, Height - 1);
-                        xmax = Math.Clamp(xmax, 0, Width - 1);
-                        ymax = Math.Clamp(ymax, 0, Height - 1);
+                        int finalXmin = Math.Max(triXmin, portalXmin);
+                        int finalYmin = Math.Max(triYmin, portalYmin);
+                        int finalXmax = Math.Min(triXmax, portalXmax);
+                        int finalYmax = Math.Min(triYmax, portalYmax);
+
+                        if (finalXmin >= finalXmax || finalYmin >= finalYmax)
+                        {
+                            continue;
+                        }
 
                         tri.normal0 = processnormals[e];
                         tri.normal1 = processnormals[e + 1];
@@ -1909,12 +1910,114 @@ public static class LevelFunctions
                         tri.edgeB2 = tri.screen1.X - tri.screen0.X;
                         tri.edgeC2 = tri.screen0.X * tri.screen1.Y - tri.screen0.Y * tri.screen1.X;
 
-                        tri.xmin = xmin;
-                        tri.ymin = ymin;
-                        tri.xmax = xmax;
-                        tri.ymax = ymax;
+                        tri.xmin = finalXmin;
+                        tri.ymin = finalYmin;
+                        tri.xmax = finalXmax;
+                        tri.ymax = finalYmax;
 
                         tri.triangleId = triangles.Count;
+
+                        int startTileX = Math.Clamp(tri.xmin / 8, 0, tilesX - 1);
+                        int endTileX = Math.Clamp(tri.xmax / 8, 0, tilesX - 1);
+                        int startTileY = Math.Clamp(tri.ymin / 8, 0, tilesY - 1);
+                        int endTileY = Math.Clamp(tri.ymax / 8, 0, tilesY - 1);
+
+                        float n0X = tri.edgeA0; float n0Y = tri.edgeB0;
+                        float n1X = tri.edgeA1; float n1Y = tri.edgeB1;
+                        float n2X = tri.edgeA2; float n2Y = tri.edgeB2;
+
+                        float triMin0 = MathF.Min(n0X * tri.screen0.X + n0Y * tri.screen0.Y, n0X * tri.screen2.X + n0Y * tri.screen2.Y);
+                        float triMax0 = MathF.Max(n0X * tri.screen0.X + n0Y * tri.screen0.Y, n0X * tri.screen2.X + n0Y * tri.screen2.Y);
+
+                        float triMin1 = MathF.Min(n1X * tri.screen1.X + n1Y * tri.screen1.Y, n1X * tri.screen0.X + n1Y * tri.screen0.Y);
+                        float triMax1 = MathF.Max(n1X * tri.screen1.X + n1Y * tri.screen1.Y, n1X * tri.screen0.X + n1Y * tri.screen0.Y);
+
+                        float triMin2 = MathF.Min(n2X * tri.screen2.X + n2Y * tri.screen2.Y, n2X * tri.screen1.X + n2Y * tri.screen1.Y);
+                        float triMax2 = MathF.Max(n2X * tri.screen2.X + n2Y * tri.screen2.Y, n2X * tri.screen1.X + n2Y * tri.screen1.Y);
+
+                        for (int y = startTileY; y <= endTileY; y++)
+                        {
+                            for (int x = startTileX; x <= endTileX; x++)
+                            {
+                                int tileIndex = y * tilesX + x;
+                                Tile tile = tiles[tileIndex];
+
+                                float tileMinX = tile.minx;
+                                float tileMinY = tile.miny;
+                                float tileMaxX = tile.maxx;
+                                float tileMaxY = tile.maxy;
+
+                                float e0_c0 = n0X * tileMinX + n0Y * tileMinY + tri.edgeC0;
+                                float e0_c1 = n0X * tileMaxX + n0Y * tileMinY + tri.edgeC0;
+                                float e0_c2 = n0X * tileMinX + n0Y * tileMaxY + tri.edgeC0;
+                                float e0_c3 = n0X * tileMaxX + n0Y * tileMaxY + tri.edgeC0;
+
+                                if (e0_c0 > 0f && e0_c1 > 0f && e0_c2 > 0f && e0_c3 > 0f)
+                                {
+                                    continue;
+                                }
+
+                                float e1_c0 = n1X * tileMinX + n1Y * tileMinY + tri.edgeC1;
+                                float e1_c1 = n1X * tileMaxX + n1Y * tileMinY + tri.edgeC1;
+                                float e1_c2 = n1X * tileMinX + n1Y * tileMaxY + tri.edgeC1;
+                                float e1_c3 = n1X * tileMaxX + n1Y * tileMaxY + tri.edgeC1;
+
+                                if (e1_c0 > 0f && e1_c1 > 0f && e1_c2 > 0f && e1_c3 > 0f)
+                                {
+                                    continue;
+                                }
+
+                                float e2_c0 = n2X * tileMinX + n2Y * tileMinY + tri.edgeC2;
+                                float e2_c1 = n2X * tileMaxX + n2Y * tileMinY + tri.edgeC2;
+                                float e2_c2 = n2X * tileMinX + n2Y * tileMaxY + tri.edgeC2;
+                                float e2_c3 = n2X * tileMaxX + n2Y * tileMaxY + tri.edgeC2;
+
+                                if (e2_c0 > 0f && e2_c1 > 0f && e2_c2 > 0f && e2_c3 > 0f)
+                                {
+                                    continue;
+                                }
+
+                                if (e0_c0 <= 0f && e0_c1 <= 0f && e0_c2 <= 0f && e0_c3 <= 0f &&
+                                    e1_c0 <= 0f && e1_c1 <= 0f && e1_c2 <= 0f && e1_c3 <= 0f &&
+                                    e2_c0 <= 0f && e2_c1 <= 0f && e2_c2 <= 0f && e2_c3 <= 0f)
+                                {
+                                    listOfIntLists[tile.listOfInts].Add(tri.triangleId);
+                                    continue;
+                                }
+
+                                float p00 = e0_c0 - tri.edgeC0; float p01 = e0_c1 - tri.edgeC0;
+                                float p02 = e0_c2 - tri.edgeC0; float p03 = e0_c3 - tri.edgeC0;
+                                float tileMinProj0 = MathF.Min(MathF.Min(p00, p01), MathF.Min(p02, p03));
+                                float tileMaxProj0 = MathF.Max(MathF.Max(p00, p01), MathF.Max(p02, p03));
+
+                                if (tileMaxProj0 < triMin0 || tileMinProj0 > triMax0)
+                                {
+                                    continue;
+                                }
+
+                                float p10 = e1_c0 - tri.edgeC1; float p11 = e1_c1 - tri.edgeC1;
+                                float p12 = e1_c2 - tri.edgeC1; float p13 = e1_c3 - tri.edgeC1;
+                                float tileMinProj1 = MathF.Min(MathF.Min(p10, p11), MathF.Min(p12, p13));
+                                float tileMaxProj1 = MathF.Max(MathF.Max(p10, p11), MathF.Max(p12, p13));
+
+                                if (tileMaxProj1 < triMin1 || tileMinProj1 > triMax1)
+                                {
+                                    continue;
+                                }
+
+                                float p20 = e2_c0 - tri.edgeC2; float p21 = e2_c1 - tri.edgeC2;
+                                float p22 = e2_c2 - tri.edgeC2; float p23 = e2_c3 - tri.edgeC2;
+                                float tileMinProj2 = MathF.Min(MathF.Min(p20, p21), MathF.Min(p22, p23));
+                                float tileMaxProj2 = MathF.Max(MathF.Max(p20, p21), MathF.Max(p22, p23));
+
+                                if (tileMaxProj2 < triMin2 || tileMinProj2 > triMax2)
+                                {
+                                    continue;
+                                }
+
+                                listOfIntLists[tile.listOfInts].Add(tri.triangleId);
+                            }
+                        }
 
                         triangles.Add(tri);
                     }
