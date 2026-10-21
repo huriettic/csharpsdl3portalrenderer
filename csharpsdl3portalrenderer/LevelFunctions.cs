@@ -1,4 +1,8 @@
 ﻿using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 
 public struct Triangle
 {
@@ -1360,7 +1364,7 @@ public static class LevelFunctions
             processboolcount += 2;
         }
 
-        for (int b = 0; b < 2; b++)
+        for (int b = 0; b < 6; b++)
         {
             int intersection = 0;
 
@@ -1379,16 +1383,41 @@ public static class LevelFunctions
                 Vector4 v0 = processEdges[c];
                 Vector4 v1 = processEdges[c + 1];
 
+                float minX = rectangle.X;
+                float minY = rectangle.Y;
+                float maxX = rectangle.Z;
+                float maxY = rectangle.W;
+
                 float d0, d1;
 
                 switch (b)
                 {
-                    case 0: // Near
+                    case 0: // Left
+                        d0 = v0.X - minX * v0.W;
+                        d1 = v1.X - minX * v1.W;
+                        break;
+
+                    case 1: // Right
+                        d0 = maxX * v0.W - v0.X;
+                        d1 = maxX * v1.W - v1.X;
+                        break;
+
+                    case 2: // Bottom
+                        d0 = v0.Y - minY * v0.W;
+                        d1 = v1.Y - minY * v1.W;
+                        break;
+
+                    case 3: // Top
+                        d0 = maxY * v0.W - v0.Y;
+                        d1 = maxY * v1.W - v1.Y;
+                        break;
+
+                    case 4: // Near
                         d0 = v0.Z;
                         d1 = v1.Z;
                         break;
 
-                    case 1: // Far
+                    case 5: // Far
                         d0 = v0.W - v0.Z;
                         d1 = v1.W - v1.Z;
                         break;
@@ -1502,17 +1531,7 @@ public static class LevelFunctions
             ymax = MathF.Max(ymax, ndc.Y);
         }
 
-        float finalXmin = MathF.Max(xmin, rectangle.X);
-        float finalYmin = MathF.Max(ymin, rectangle.Y);
-        float finalXmax = MathF.Min(xmax, rectangle.Z);
-        float finalYmax = MathF.Min(ymax, rectangle.W);
-
-        if (finalXmin >= finalXmax || finalYmin >= finalYmax)
-        {
-            return Vector4.Zero;
-        }
-
-        return new Vector4(finalXmin, finalYmin, finalXmax, finalYmax);
+        return new Vector4(xmin, ymin, xmax, ymax);
     }
 
     public static void ClipTrianglesWithRectangles(int count, Vector4[] rectangles, MeshMeta world, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, List<List<int>> listOfIntLists, Tile[] tiles, int tilesX, int tilesY)
@@ -2020,6 +2039,327 @@ public static class LevelFunctions
                         }
 
                         triangles.Add(tri);
+                    }
+                }
+            }
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
+    public static void DrawTiles(Tile[] tiles, List<List<int>> listOfIntLists, List<Triangle> triangles, int Width, int Height, int texWidth, int texHeight, int maskX, int maskY, uint[] sampleTexture, uint[] backBuffer, float[] depthBuffer, Vector3 lightDir)
+    {
+        if (Avx2.IsSupported)
+        {
+            ReadOnlySpan<uint> sampleTexSpan = sampleTexture;
+            Span<uint> backBufferSpan = backBuffer;
+            Span<float> depthBufferSpan = depthBuffer;
+
+            ref uint sampleTexRef = ref MemoryMarshal.GetReference(sampleTexSpan);
+            ref uint backBufferRef = ref MemoryMarshal.GetReference(backBufferSpan);
+            ref float depthBufferRef = ref MemoryMarshal.GetReference(depthBufferSpan);
+
+            int totalTiles = tiles.Length;
+
+            Vector256<float> vHalf = Vector256.Create(0.5f);
+            Vector256<float> vZero = Vector256.Create(0f);
+            Vector256<float> vOne = Vector256.Create(1.0f);
+            Vector256<float> vPointTwo = Vector256.Create(0.2f);
+            Vector256<float> vXOffsets = Vector256.Create(0f, 1f, 2f, 3f, 4f, 5f, 6f, 7f);
+            Vector256<int> vMaskX = Vector256.Create(maskX);
+            Vector256<int> vMaskY = Vector256.Create(maskY);
+            Vector256<int> vTexWidth = Vector256.Create(texWidth);
+            Vector256<float> vTexWidthF = Vector256.Create((float)texWidth);
+            Vector256<float> vTexHeightF = Vector256.Create((float)texHeight);
+            Vector256<int> v255 = Vector256.Create(255);
+
+            for (int t = 0; t < totalTiles; t++)
+            {
+                Tile tile = tiles[t];
+                List<int> binnedTriangleIds = listOfIntLists[tile.listOfInts];
+                int binnedCount = binnedTriangleIds.Count;
+                if (binnedCount == 0)
+                {
+                    continue;
+                }
+
+                int tileMinX = tile.minx;
+                int tileMaxX = tile.maxx;
+                int tileMinY = tile.miny;
+                int tileMaxY = tile.maxy;
+
+                for (int bt = 0; bt < binnedCount; bt++)
+                {
+                    Triangle tri = triangles[binnedTriangleIds[bt]];
+
+                    int startY = Math.Max(tileMinY, tri.ymin);
+                    int endY = Math.Min(tileMaxY - 1, tri.ymax);
+                    int startX = Math.Max(tileMinX, tri.xmin);
+                    int endX = Math.Min(tileMaxX - 1, tri.xmax);
+
+                    if (startX > endX || startY > endY)
+                    {
+                        continue;
+                    }
+
+                    Vector256<float> vEdgeA0 = Vector256.Create(tri.edgeA0);
+                    Vector256<float> vEdgeB0 = Vector256.Create(tri.edgeB0);
+                    Vector256<float> vEdgeC0 = Vector256.Create(tri.edgeC0);
+
+                    Vector256<float> vEdgeA1 = Vector256.Create(tri.edgeA1);
+                    Vector256<float> vEdgeB1 = Vector256.Create(tri.edgeB1);
+                    Vector256<float> vEdgeC1 = Vector256.Create(tri.edgeC1);
+
+                    Vector256<float> vEdgeA2 = Vector256.Create(tri.edgeA2);
+                    Vector256<float> vEdgeB2 = Vector256.Create(tri.edgeB2);
+                    Vector256<float> vEdgeC2 = Vector256.Create(tri.edgeC2);
+
+                    Vector256<float> vInvArea = Vector256.Create(tri.invArea);
+                    Vector256<float> vInvw0 = Vector256.Create(tri.invw0);
+                    Vector256<float> vInvw1 = Vector256.Create(tri.invw1);
+                    Vector256<float> vInvw2 = Vector256.Create(tri.invw2);
+
+                    Vector256<float> vInvz0 = Vector256.Create(tri.invz0);
+                    Vector256<float> vInvz1 = Vector256.Create(tri.invz1);
+                    Vector256<float> vInvz2 = Vector256.Create(tri.invz2);
+
+                    Vector256<float> vLdirX = Vector256.Create(lightDir.X);
+                    Vector256<float> vLdirY = Vector256.Create(lightDir.Y);
+                    Vector256<float> vLdirZ = Vector256.Create(lightDir.Z);
+
+                    Vector256<float> vN0X = Vector256.Create(tri.normal0.X * tri.invw0);
+                    Vector256<float> vN0Y = Vector256.Create(tri.normal0.Y * tri.invw0);
+                    Vector256<float> vN0Z = Vector256.Create(tri.normal0.Z * tri.invw0);
+
+                    Vector256<float> vN1X = Vector256.Create(tri.normal1.X * tri.invw1);
+                    Vector256<float> vN1Y = Vector256.Create(tri.normal1.Y * tri.invw1);
+                    Vector256<float> vN1Z = Vector256.Create(tri.normal1.Z * tri.invw1);
+
+                    Vector256<float> vN2X = Vector256.Create(tri.normal2.X * tri.invw2);
+                    Vector256<float> vN2Y = Vector256.Create(tri.normal2.Y * tri.invw2);
+                    Vector256<float> vN2Z = Vector256.Create(tri.normal2.Z * tri.invw2);
+
+                    Vector256<float> vUv0X = Vector256.Create(tri.invuv0.X);
+                    Vector256<float> vUv0Y = Vector256.Create(tri.invuv0.Y);
+                    Vector256<float> vUv1X = Vector256.Create(tri.invuv1.X);
+                    Vector256<float> vUv1Y = Vector256.Create(tri.invuv1.Y);
+                    Vector256<float> vUv2X = Vector256.Create(tri.invuv2.X);
+                    Vector256<float> vUv2Y = Vector256.Create(tri.invuv2.Y);
+
+                    Vector256<int> vEndX = Vector256.Create(endX);
+
+                    Vector256<float> xBase = Fma.MultiplyAdd(vEdgeA0, vXOffsets, vEdgeC0);
+                    Vector256<float> xBase1 = Fma.MultiplyAdd(vEdgeA1, vXOffsets, vEdgeC1);
+                    Vector256<float> xBase2 = Fma.MultiplyAdd(vEdgeA2, vXOffsets, vEdgeC2);
+
+                    for (int y = startY; y <= endY; y++)
+                    {
+                        float pyScalar = y + 0.5f;
+                        Vector256<float> py = Vector256.Create(pyScalar);
+                        int rowOffset = y * Width;
+
+                        Vector256<float> yEdge0 = Fma.MultiplyAdd(vEdgeB0, py, xBase);
+                        Vector256<float> yEdge1 = Fma.MultiplyAdd(vEdgeB1, py, xBase1);
+                        Vector256<float> yEdge2 = Fma.MultiplyAdd(vEdgeB2, py, xBase2);
+
+                        float xStep0 = tri.edgeA0 * 8f;
+                        float xStep1 = tri.edgeA1 * 8f;
+                        float xStep2 = tri.edgeA2 * 8f;
+
+                        for (int x = startX; x <= endX; x += 8)
+                        {
+                            float xCurrentF = (float)x;
+                            Vector256<float> edge0 = Fma.MultiplyAdd(vEdgeA0, Vector256.Create(xCurrentF), yEdge0);
+                            Vector256<float> edge1 = Fma.MultiplyAdd(vEdgeA1, Vector256.Create(xCurrentF), yEdge1);
+                            Vector256<float> edge2 = Fma.MultiplyAdd(vEdgeA2, Vector256.Create(xCurrentF), yEdge2);
+
+                            Vector256<float> mEdge0 = Avx2.CompareLessThanOrEqual(edge0, vZero);
+                            Vector256<float> mEdge1 = Avx2.CompareLessThanOrEqual(edge1, vZero);
+                            Vector256<float> mEdge2 = Avx2.CompareLessThanOrEqual(edge2, vZero);
+                            Vector256<float> coverageMask = Avx2.And(Avx2.And(mEdge0, mEdge1), mEdge2);
+
+                            Vector256<float> px = Avx2.Add(Vector256.Create(xCurrentF), vXOffsets);
+                            Vector256<int> vXCoords = Avx.ConvertToVector256Int32(px);
+                            Vector256<int> boundsMask = Vector256.LessThanOrEqual(vXCoords, vEndX);
+                            coverageMask = Avx2.And(coverageMask, boundsMask.AsSingle());
+
+                            if (Avx2.MoveMask(coverageMask) == 0)
+                            {
+                                continue;
+                            }
+
+                            Vector256<float> w0 = Avx2.Multiply(edge0, vInvArea);
+                            Vector256<float> w1 = Avx2.Multiply(edge1, vInvArea);
+                            Vector256<float> w2 = Avx2.Multiply(edge2, vInvArea);
+
+                            Vector256<float> iweight = Fma.MultiplyAdd(w0, vInvw0, Fma.MultiplyAdd(w1, vInvw1, Avx2.Multiply(w2, vInvw2)));
+                            Vector256<float> invWeight = Avx2.Divide(vOne, iweight);
+                            Vector256<float> z = Avx2.Multiply(Fma.MultiplyAdd(w0, vInvz0, Fma.MultiplyAdd(w1, vInvz1, Avx2.Multiply(w2, vInvz2))), invWeight);
+
+                            int pBase = rowOffset + x;
+                            ref float depthPtr = ref Unsafe.Add(ref depthBufferRef, pBase);
+                            Vector256<float> currentDepth = Vector256.LoadUnsafe(ref depthPtr);
+                            Vector256<float> depthMask = Avx2.CompareLessThan(z, currentDepth);
+
+                            Vector256<float> finalMask = Avx2.And(coverageMask, depthMask);
+                            if (Avx2.MoveMask(finalMask) == 0)
+                            {
+                                continue;
+                            }
+
+                            Vector256<float> blendedDepth = Avx2.BlendVariable(currentDepth, z, finalMask);
+                            Vector256.StoreUnsafe(blendedDepth, ref depthPtr);
+
+                            Vector256<float> nX = Avx2.Multiply(Fma.MultiplyAdd(w0, vN0X, Fma.MultiplyAdd(w1, vN1X, Avx2.Multiply(w2, vN2X))), invWeight);
+                            Vector256<float> nY = Avx2.Multiply(Fma.MultiplyAdd(w0, vN0Y, Fma.MultiplyAdd(w1, vN1Y, Avx2.Multiply(w2, vN2Y))), invWeight);
+                            Vector256<float> nZ = Avx2.Multiply(Fma.MultiplyAdd(w0, vN0Z, Fma.MultiplyAdd(w1, vN1Z, Avx2.Multiply(w2, vN2Z))), invWeight);
+                            Vector256<float> lengthSq = Fma.MultiplyAdd(nX, nX, Fma.MultiplyAdd(nY, nY, Avx2.Multiply(nZ, nZ)));
+                            Vector256<float> invLength = Avx2.ReciprocalSqrt(lengthSq);
+                            nX = Avx2.Multiply(nX, invLength);
+                            nY = Avx2.Multiply(nY, invLength);
+                            nZ = Avx2.Multiply(nZ, invLength);
+                            Vector256<float> dot = Fma.MultiplyAdd(nX, vLdirX, Fma.MultiplyAdd(nY, vLdirY, Avx2.Multiply(nZ, vLdirZ)));
+                            Vector256<float> diffuse = Fma.MultiplyAdd(dot, vHalf, vHalf);
+                            diffuse = Avx2.Min(vOne, Fma.MultiplyAdd(diffuse, diffuse, vPointTwo));
+                            Vector256<float> uvX = Avx2.Multiply(Fma.MultiplyAdd(w0, vUv0X, Fma.MultiplyAdd(w1, vUv1X, Avx2.Multiply(w2, vUv2X))), invWeight);
+                            Vector256<float> uvY = Avx2.Multiply(Fma.MultiplyAdd(w0, vUv0Y, Fma.MultiplyAdd(w1, vUv1Y, Avx2.Multiply(w2, vUv2Y))), invWeight);
+
+                            Vector256<int> tx = Avx.ConvertToVector256Int32(Avx2.Floor(Avx2.Multiply(uvX, vTexWidthF))) & vMaskX;
+                            Vector256<int> ty = Avx.ConvertToVector256Int32(Avx2.Floor(Avx2.Multiply(uvY, vTexHeightF))) & vMaskY;
+
+                            Vector256<int> texIndices = (ty * vTexWidth) + tx;
+
+                            Vector256<int> col = Vector256.Create(
+                                (int)Unsafe.Add(ref sampleTexRef, (nint)texIndices.GetElement(0)),
+                                (int)Unsafe.Add(ref sampleTexRef, (nint)texIndices.GetElement(1)),
+                                (int)Unsafe.Add(ref sampleTexRef, (nint)texIndices.GetElement(2)),
+                                (int)Unsafe.Add(ref sampleTexRef, (nint)texIndices.GetElement(3)),
+                                (int)Unsafe.Add(ref sampleTexRef, (nint)texIndices.GetElement(4)),
+                                (int)Unsafe.Add(ref sampleTexRef, (nint)texIndices.GetElement(5)),
+                                (int)Unsafe.Add(ref sampleTexRef, (nint)texIndices.GetElement(6)),
+                                (int)Unsafe.Add(ref sampleTexRef, (nint)texIndices.GetElement(7))
+                            );
+
+                            Vector256<float> r = Avx2.Multiply(Avx.ConvertToVector256Single(col & v255), diffuse);
+                            Vector256<float> g = Avx2.Multiply(Avx.ConvertToVector256Single(Avx2.ShiftRightLogical(col, 8) & v255), diffuse);
+                            Vector256<float> b = Avx2.Multiply(Avx.ConvertToVector256Single(Avx2.ShiftRightLogical(col, 16) & v255), diffuse);
+
+                            Vector256<int> a = Avx2.ShiftRightLogical(col, 24) & v255;
+
+                            Vector256<int> rInt = Avx.ConvertToVector256Int32(r);
+                            Vector256<int> gInt = Avx.ConvertToVector256Int32(g);
+                            Vector256<int> bInt = Avx.ConvertToVector256Int32(b);
+
+                            Vector256<int> finalCol = rInt |
+                                                      Avx2.ShiftLeftLogical(gInt, 8) |
+                                                      Avx2.ShiftLeftLogical(bInt, 16) |
+                                                      Avx2.ShiftLeftLogical(a, 24);
+
+                            ref uint backBufferPtr = ref Unsafe.Add(ref backBufferRef, pBase);
+
+                            Vector256<int> currentBuffer = Vector256.LoadUnsafe(ref backBufferPtr).AsInt32();
+                            Vector256<int> blendedCol = Avx2.BlendVariable(currentBuffer, finalCol, finalMask.AsInt32());
+
+                            Vector256.StoreUnsafe(blendedCol.AsUInt32(), ref backBufferPtr);
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            int totalTiles = tiles.Length;
+            for (int t = 0; t < totalTiles; t++)
+            {
+                Tile tile = tiles[t];
+
+                int intsList = tile.listOfInts;
+                List<int> binnedTriangleIds = listOfIntLists[intsList];
+
+                int binnedCount = binnedTriangleIds.Count;
+
+                if (binnedCount == 0)
+                {
+                    continue;
+                }
+
+                int tileMinX = tile.minx;
+                int tileMaxX = tile.maxx;
+                int tileMinY = tile.miny;
+                int tileMaxY = tile.maxy;
+
+                for (int bt = 0; bt < binnedCount; bt++)
+                {
+                    Triangle tri = triangles[binnedTriangleIds[bt]];
+
+                    int startY = Math.Max(tileMinY, tri.ymin);
+                    int endY = Math.Min(tileMaxY - 1, tri.ymax);
+                    int startX = Math.Max(tileMinX, tri.xmin);
+                    int endX = Math.Min(tileMaxX - 1, tri.xmax);
+
+                    if (startX > endX || startY > endY)
+                    {
+                        continue;
+                    }
+
+                    for (int y = startY; y <= endY; y++)
+                    {
+                        float py = y + 0.5f;
+                        int rowOffset = y * Width;
+
+                        for (int x = startX; x <= endX; x++)
+                        {
+                            float px = x + 0.5f;
+                            int p = rowOffset + x;
+
+                            float edge0 = tri.edgeA0 * px + tri.edgeB0 * py + tri.edgeC0;
+                            float edge1 = tri.edgeA1 * px + tri.edgeB1 * py + tri.edgeC1;
+                            float edge2 = tri.edgeA2 * px + tri.edgeB2 * py + tri.edgeC2;
+
+                            if (edge0 > 0f || edge1 > 0f || edge2 > 0f)
+                            {
+                                continue;
+                            }
+
+                            float weight0 = edge0 * tri.invArea;
+                            float weight1 = edge1 * tri.invArea;
+                            float weight2 = edge2 * tri.invArea;
+
+                            float iweight = weight0 * tri.invw0 + weight1 * tri.invw1 + weight2 * tri.invw2;
+                            float invWeight = 1.0f / iweight;
+
+                            float z = (weight0 * tri.invz0 + weight1 * tri.invz1 + weight2 * tri.invz2) * invWeight;
+
+                            if (z >= depthBuffer[p])
+                            {
+                                continue;
+                            }
+
+                            depthBuffer[p] = z;
+
+                            Vector3 normal = (weight0 * tri.normal0 * tri.invw0 +
+                                              weight1 * tri.normal1 * tri.invw1 +
+                                              weight2 * tri.normal2 * tri.invw2) * invWeight;
+                            Vector3 N = Vector3.Normalize(normal);
+                            float diffuse = Vector3.Dot(N, lightDir) * 0.5f + 0.5f;
+                            diffuse = MathF.Min(1.0f, (diffuse * diffuse) + 0.2f);
+
+                            Vector2 uv = (weight0 * tri.invuv0 + weight1 * tri.invuv1 + weight2 * tri.invuv2) * invWeight;
+
+                            float texX = uv.X * texWidth;
+                            float texY = uv.Y * texHeight;
+
+                            int tx = ((int)texX - (texX < 0 ? 1 : 0)) & maskX;
+                            int ty = ((int)texY - (texY < 0 ? 1 : 0)) & maskY;
+
+                            uint col = sampleTexture[ty * texWidth + tx];
+
+                            byte r = (byte)Math.Clamp(((col >> 0) & 255) * diffuse, 0, 255);
+                            byte g = (byte)Math.Clamp(((col >> 8) & 255) * diffuse, 0, 255);
+                            byte b = (byte)Math.Clamp(((col >> 16) & 255) * diffuse, 0, 255);
+                            byte a = (byte)((col >> 24) & 255);
+
+                            backBuffer[p] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
+                        }
                     }
                 }
             }

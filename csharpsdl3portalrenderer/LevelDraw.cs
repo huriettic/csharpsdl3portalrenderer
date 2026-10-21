@@ -1,6 +1,6 @@
-﻿using System.Numerics;
+﻿using SDL3;
+using System.Numerics;
 using System.Runtime.InteropServices;
-using SDL3;
 using static LevelFunctions;
 
 public static class LevelDraw
@@ -351,102 +351,9 @@ public static class LevelDraw
             );
             Array.Fill(depthBuffer, float.PositiveInfinity);
             Array.Clear(backBuffer, 0, backBuffer.Length);
-
-            Parallel.For(0, tiles.Length, tileX =>
-            {
-                Tile tile = tiles[tileX];
-
-                int intsList = tile.listOfInts;
-                List<int> binnedTriangleIds = ListOfIntLists[intsList];
-
-                int binnedCount = binnedTriangleIds.Count;
-                if (binnedCount == 0) 
-                {
-                    return;
-                } 
-
-                int tileMinX = tile.minx;
-                int tileMaxX = tile.maxx;
-                int tileMinY = tile.miny;
-                int tileMaxY = tile.maxy;
-
-                for (int t = 0; t < binnedCount; t++)
-                {
-                    int triId = binnedTriangleIds[t];
-                    Triangle tri = Triangles[triId];
-
-                    int startY = Math.Max(tileMinY, tri.ymin);
-                    int endY = Math.Min(tileMaxY - 1, tri.ymax);
-                    int startX = Math.Max(tileMinX, tri.xmin);
-                    int endX = Math.Min(tileMaxX - 1, tri.xmax);
-
-                    if (startX > endX || startY > endY)
-                    {
-                        continue;
-                    }
-                    for (int y = startY; y <= endY; y++)
-                    {
-                        float py = y + 0.5f;
-                        int rowOffset = y * Width;
-
-                        for (int x = startX; x <= endX; x++)
-                        {
-                            float px = x + 0.5f;
-                            int pixelX = rowOffset + x;
-
-                            float edge0 = tri.edgeA0 * px + tri.edgeB0 * py + tri.edgeC0;
-                            float edge1 = tri.edgeA1 * px + tri.edgeB1 * py + tri.edgeC1;
-                            float edge2 = tri.edgeA2 * px + tri.edgeB2 * py + tri.edgeC2;
-
-                            if (edge0 > 0f || edge1 > 0f || edge2 > 0f) 
-                            {
-                                continue;
-                            }
-
-                            float weight0 = edge0 * tri.invArea;
-                            float weight1 = edge1 * tri.invArea;
-                            float weight2 = edge2 * tri.invArea;
-
-                            float iweight = weight0 * tri.invw0 + weight1 * tri.invw1 + weight2 * tri.invw2;
-
-                            float invWeight = 1.0f / iweight;
-
-                            float z = (weight0 * tri.invz0 + weight1 * tri.invz1 + weight2 * tri.invz2) * invWeight;
-
-                            if (z >= depthBuffer[pixelX])
-                            {
-                                continue;
-                            }
-                            depthBuffer[pixelX] = z;
-
-                            Vector3 normal = (weight0 * tri.normal0 * tri.invw0 +
-                                              weight1 * tri.normal1 * tri.invw1 +
-                                              weight2 * tri.normal2 * tri.invw2) * invWeight;
-                            Vector3 N = Vector3.Normalize(normal);
-                            float diffuse = Vector3.Dot(N, lightDir) * 0.5f + 0.5f;
-                            diffuse = MathF.Min(1.0f, (diffuse * diffuse) + 0.2f);
-
-                            Vector2 uv = (weight0 * tri.invuv0 + weight1 * tri.invuv1 + weight2 * tri.invuv2) * invWeight;
-
-                            float texX = uv.X * texWidth;
-                            float texY = uv.Y * texHeight;
-
-                            int tx = ((int)texX - (texX < 0 ? 1 : 0)) & maskX;
-                            int ty = ((int)texY - (texY < 0 ? 1 : 0)) & maskY;
-
-                            uint col = sampleTexture[ty * texWidth + tx];
-
-                            byte r = (byte)Math.Clamp(((col >> 0) & 255) * diffuse, 0, 255);
-                            byte g = (byte)Math.Clamp(((col >> 8) & 255) * diffuse, 0, 255);
-                            byte b = (byte)Math.Clamp(((col >> 16) & 255) * diffuse, 0, 255);
-                            byte a = (byte)((col >> 24) & 255);
-
-                            backBuffer[pixelX] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
-                        }
-                    }
-                }
-            });
-
+            
+            DrawTiles(tiles, ListOfIntLists, Triangles, Width, Height, texWidth, texHeight, maskX, maskY, sampleTexture, backBuffer, depthBuffer, lightDir);
+            
             ReadOnlySpan<byte> pixelBytes = MemoryMarshal.AsBytes(backBuffer.AsSpan());
             SDL.UpdateTexture(streamingTexture, IntPtr.Zero, pixelBytes, Width * sizeof(uint));
             SDL.RenderClear(renderer);
