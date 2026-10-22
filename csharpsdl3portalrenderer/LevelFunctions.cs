@@ -107,19 +107,18 @@ public struct ColliderMeta
 
 public struct Tile
 {
-    public int listOfInts;
+    public int frameFlag;
     public int minx;
     public int miny;
     public int maxx;
     public int maxy;
+    public int intsCount;
 };
 
 public static class LevelFunctions
 {
     public static void InitializeTiles(int tilesX, int tilesY, Tile[] tiles)
     {
-        int tilesListCounter = 0;
-
         for (int y = 0; y < tilesY; y++)
         {
             for (int x = 0; x < tilesX; x++)
@@ -128,14 +127,13 @@ public static class LevelFunctions
 
                 tiles[index] = new Tile
                 {
-                    listOfInts = tilesListCounter,
+                    frameFlag = 0,
                     minx = x * 8,
                     miny = y * 8,
                     maxx = (x + 1) * 8,
-                    maxy = (y + 1) * 8
+                    maxy = (y + 1) * 8,
+                    intsCount = 0
                 };
-
-                tilesListCounter += 1;
             }
         }
     }
@@ -162,18 +160,6 @@ public static class LevelFunctions
         }
 
         return ListOfSectorLists;
-    }
-
-    public static List<List<int>> MakeIntLists(int tileCount)
-    {
-        List<List<int>> ListOfIntLists = new List<List<int>>();
-
-        for (int i = 0; i < tileCount; i++)
-        {
-            ListOfIntLists.Add(new List<int>());
-        }
-
-        return ListOfIntLists;
     }
 
     public static int[] contactSectorsMake(List<SectorMeta> sectors)
@@ -333,7 +319,7 @@ public static class LevelFunctions
         }
     }
 
-    public static void SetTriangles(int[] visibleSectors, List<MeshMeta> meshes, Vector4[][] ArrayOfRectangleArrays, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, List<List<int>> listOfIntLists, Tile[] tiles, int tilesX, int tilesY)
+    public static void SetTriangles(int[] visibleSectors, List<MeshMeta> meshes, Vector4[][] ArrayOfRectangleArrays, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, int[] ArrayOfInts, Tile[] tiles, int tilesX, int tilesY, int frameAlternate)
     {
         for (int a = 0; a < visibleSectors.Length; a++)
         {
@@ -348,7 +334,7 @@ public static class LevelFunctions
 
             Vector4[] rectanglesArray = ArrayOfRectangleArrays[a];
 
-            ClipTrianglesWithRectangles(count, rectanglesArray, mesh, vertices, textures, normals, indices, CamPosition, processbool, processvertices, temporaryvertices, processtextures, temporarytextures, processnormals, temporarynormals, triangles, CamViewProj, Width, Height, listOfIntLists, tiles, tilesX, tilesY);
+            ClipTrianglesWithRectangles(count, rectanglesArray, mesh, vertices, textures, normals, indices, CamPosition, processbool, processvertices, temporaryvertices, processtextures, temporarytextures, processnormals, temporarynormals, triangles, CamViewProj, Width, Height, ArrayOfInts, tiles, tilesX, tilesY, frameAlternate);
         }
     }
 
@@ -1534,7 +1520,7 @@ public static class LevelFunctions
         return new Vector4(xmin, ymin, xmax, ymax);
     }
 
-    public static void ClipTrianglesWithRectangles(int count, Vector4[] rectangles, MeshMeta world, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, List<List<int>> listOfIntLists, Tile[] tiles, int tilesX, int tilesY)
+    public static void ClipTrianglesWithRectangles(int count, Vector4[] rectangles, MeshMeta world, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, int[] ArrayOfInts, Tile[] tiles, int tilesX, int tilesY, int frameAlternate)
     {
         for (int i = 0; i < count; i++)
         {
@@ -1961,6 +1947,14 @@ public static class LevelFunctions
                                 int tileIndex = y * tilesX + x;
                                 Tile tile = tiles[tileIndex];
 
+                                if (tiles[tileIndex].frameFlag != frameAlternate)
+                                {
+                                    tiles[tileIndex].intsCount = 0;
+                                    tiles[tileIndex].frameFlag = frameAlternate;
+                                }
+
+                                int intCount = tiles[tileIndex].intsCount;
+
                                 float tileMinX = tile.minx;
                                 float tileMinY = tile.miny;
                                 float tileMaxX = tile.maxx;
@@ -2000,7 +1994,12 @@ public static class LevelFunctions
                                     e1_c0 <= 0f && e1_c1 <= 0f && e1_c2 <= 0f && e1_c3 <= 0f &&
                                     e2_c0 <= 0f && e2_c1 <= 0f && e2_c2 <= 0f && e2_c3 <= 0f)
                                 {
-                                    listOfIntLists[tile.listOfInts].Add(tri.triangleId);
+                                    if (intCount < 512)
+                                    {
+                                        int destIndex = (tileIndex * 512) + intCount;
+                                        ArrayOfInts[destIndex] = tri.triangleId;
+                                        tiles[tileIndex].intsCount++;
+                                    }
                                     continue;
                                 }
 
@@ -2034,7 +2033,12 @@ public static class LevelFunctions
                                     continue;
                                 }
 
-                                listOfIntLists[tile.listOfInts].Add(tri.triangleId);
+                                if (intCount < 512)
+                                {
+                                    int destIndex = (tileIndex * 512) + intCount;
+                                    ArrayOfInts[destIndex] = tri.triangleId;
+                                    tiles[tileIndex].intsCount++;
+                                }
                             }
                         }
 
@@ -2046,7 +2050,7 @@ public static class LevelFunctions
     }
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
-    public static void DrawTiles(Tile[] tiles, List<List<int>> listOfIntLists, List<Triangle> triangles, int Width, int Height, int texWidth, int texHeight, int maskX, int maskY, uint[] sampleTexture, uint[] backBuffer, float[] depthBuffer, Vector3 lightDir)
+    public static void DrawTiles(Tile[] tiles, int[] ArrayOfInts, List<Triangle> triangles, int Width, int Height, int texWidth, int texHeight, int maskX, int maskY, uint[] sampleTexture, uint[] backBuffer, float[] depthBuffer, Vector3 lightDir)
     {
         if (Avx2.IsSupported)
         {
@@ -2075,9 +2079,7 @@ public static class LevelFunctions
             for (int t = 0; t < totalTiles; t++)
             {
                 Tile tile = tiles[t];
-                List<int> binnedTriangleIds = listOfIntLists[tile.listOfInts];
-                int binnedCount = binnedTriangleIds.Count;
-                if (binnedCount == 0)
+                if (tile.intsCount == 0)
                 {
                     continue;
                 }
@@ -2087,9 +2089,12 @@ public static class LevelFunctions
                 int tileMinY = tile.miny;
                 int tileMaxY = tile.maxy;
 
-                for (int bt = 0; bt < binnedCount; bt++)
+                int startOffset = t * 512;
+
+                for (int bt = 0; bt < tile.intsCount; bt++)
                 {
-                    Triangle tri = triangles[binnedTriangleIds[bt]];
+                    int triId = ArrayOfInts[startOffset + bt];
+                    Triangle tri = triangles[triId];
 
                     int startY = Math.Max(tileMinY, tri.ymin);
                     int endY = Math.Min(tileMaxY - 1, tri.ymax);
@@ -2271,13 +2276,7 @@ public static class LevelFunctions
             for (int t = 0; t < totalTiles; t++)
             {
                 Tile tile = tiles[t];
-
-                int intsList = tile.listOfInts;
-                List<int> binnedTriangleIds = listOfIntLists[intsList];
-
-                int binnedCount = binnedTriangleIds.Count;
-
-                if (binnedCount == 0)
+                if (tile.intsCount == 0)
                 {
                     continue;
                 }
@@ -2287,9 +2286,12 @@ public static class LevelFunctions
                 int tileMinY = tile.miny;
                 int tileMaxY = tile.maxy;
 
-                for (int bt = 0; bt < binnedCount; bt++)
+                int startOffset = t * 512;
+
+                for (int bt = 0; bt < tile.intsCount; bt++)
                 {
-                    Triangle tri = triangles[binnedTriangleIds[bt]];
+                    int triId = ArrayOfInts[startOffset + bt];
+                    Triangle tri = triangles[triId];
 
                     int startY = Math.Max(tileMinY, tri.ymin);
                     int endY = Math.Min(tileMaxY - 1, tri.ymax);

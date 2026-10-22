@@ -62,11 +62,12 @@ public static class LevelDraw
 
     static List<SectorMeta> Sectors = new();
     static List<List<SectorMeta>> ListOfSectorLists = new();
-    static List<List<int>> ListOfIntLists = new();
+    static int[] ArrayOfInts = Array.Empty<int>();
     static Tile[] tiles = new Tile[tilesX * tilesY];
     static Vector4[][] ArrayOfRectangleArrays = Array.Empty<Vector4[]>();
     static int[] visibleSectors = Array.Empty<int>();
     static int[] contactingSectors = Array.Empty<int>();
+    static int frameAlternate = 0;
 
     static Random rng = new();
 
@@ -262,7 +263,8 @@ public static class LevelDraw
         InitializeTiles(tilesX, tilesY, tiles);
 
         ListOfSectorLists = MakeLists();
-        ListOfIntLists = MakeIntLists(tiles.Length);
+        ArrayOfInts = new int[tiles.Length * 512];
+
         ArrayOfRectangleArrays = ArrayOfArraysMake(TopLevelLists.sectors);
         visibleSectors = VisibleSectorsMake(TopLevelLists.sectors);
         contactingSectors = contactSectorsMake(TopLevelLists.sectors);
@@ -336,10 +338,6 @@ public static class LevelDraw
             processEdges, temporaryEdges, boolEdges
             );
             Triangles.Clear();
-            for (int i = 0; i < ListOfIntLists.Count; i++)
-            {
-                ListOfIntLists[i].Clear();
-            }
             SetTriangles(
             visibleSectors, TopLevelLists.meshes, ArrayOfRectangleArrays,
             TopLevelLists.vertices, TopLevelLists.textures, TopLevelLists.normals,
@@ -347,18 +345,20 @@ public static class LevelDraw
             processbool, processvertices, temporaryvertices,
             processtextures, temporarytextures,
             processnormals, temporarynormals,
-            Triangles, Camera3D.ViewProjectionMatrix, Width, Height, ListOfIntLists, tiles, tilesX, tilesY
+            Triangles, Camera3D.ViewProjectionMatrix, Width, Height, ArrayOfInts, tiles, tilesX, tilesY, frameAlternate
             );
             Array.Fill(depthBuffer, float.PositiveInfinity);
             Array.Clear(backBuffer, 0, backBuffer.Length);
             
-            DrawTiles(tiles, ListOfIntLists, Triangles, Width, Height, texWidth, texHeight, maskX, maskY, sampleTexture, backBuffer, depthBuffer, lightDir);
+            DrawTiles(tiles, ArrayOfInts, Triangles, Width, Height, texWidth, texHeight, maskX, maskY, sampleTexture, backBuffer, depthBuffer, lightDir);
             
             ReadOnlySpan<byte> pixelBytes = MemoryMarshal.AsBytes(backBuffer.AsSpan());
             SDL.UpdateTexture(streamingTexture, IntPtr.Zero, pixelBytes, Width * sizeof(uint));
             SDL.RenderClear(renderer);
             SDL.RenderTexture(renderer, streamingTexture, IntPtr.Zero, IntPtr.Zero);
             SDL.RenderPresent(renderer);
+
+            frameAlternate = 1 - frameAlternate;
         }
         SDL.DestroyTexture(streamingTexture);
         SDL.DestroyRenderer(renderer);
