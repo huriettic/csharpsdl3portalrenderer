@@ -1,19 +1,19 @@
 ﻿using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
 
 public struct Triangle
 {
     public Vector2 screen0, screen1, screen2;
     public Vector2 invuv0, invuv1, invuv2;
-    public Vector3 normal0, normal1, normal2;
     public float invz0, invz1, invz2;
     public float invw0, invw1, invw2;
     public float edgeA0, edgeB0, edgeC0;
     public float edgeA1, edgeB1, edgeC1;
     public float edgeA2, edgeB2, edgeC2;
+    public float invwx, invwy;
+    public float invzx, invzy;
+    public float invux, invuy;
+    public float invvx, invvy;
+    public float diffuse;
     public float invArea;
     public int xmin;
     public int ymin;
@@ -319,7 +319,7 @@ public static class LevelFunctions
         }
     }
 
-    public static void SetTriangles(int[] visibleSectors, List<MeshMeta> meshes, Vector4[][] ArrayOfRectangleArrays, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, int[] ArrayOfInts, Tile[] tiles, int tilesX, int tilesY, int frameAlternate)
+    public static void SetTriangles(int[] visibleSectors, List<MeshMeta> meshes, Vector4[][] ArrayOfRectangleArrays, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, int[] ArrayOfInts, Tile[] tiles, int tilesX, int tilesY, int frameAlternate, int texWidth, int texHeight, Vector3 lightDir)
     {
         for (int a = 0; a < visibleSectors.Length; a++)
         {
@@ -334,7 +334,7 @@ public static class LevelFunctions
 
             Vector4[] rectanglesArray = ArrayOfRectangleArrays[a];
 
-            ClipTrianglesWithRectangles(count, rectanglesArray, mesh, vertices, textures, normals, indices, CamPosition, processbool, processvertices, temporaryvertices, processtextures, temporarytextures, processnormals, temporarynormals, triangles, CamViewProj, Width, Height, ArrayOfInts, tiles, tilesX, tilesY, frameAlternate);
+            ClipTrianglesWithRectangles(count, rectanglesArray, mesh, vertices, textures, normals, indices, CamPosition, processbool, processvertices, temporaryvertices, processtextures, temporarytextures, processnormals, temporarynormals, triangles, CamViewProj, Width, Height, ArrayOfInts, tiles, tilesX, tilesY, frameAlternate, texWidth, texHeight, lightDir);
         }
     }
 
@@ -1520,7 +1520,7 @@ public static class LevelFunctions
         return new Vector4(xmin, ymin, xmax, ymax);
     }
 
-    public static void ClipTrianglesWithRectangles(int count, Vector4[] rectangles, MeshMeta world, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, int[] ArrayOfInts, Tile[] tiles, int tilesX, int tilesY, int frameAlternate)
+    public static void ClipTrianglesWithRectangles(int count, Vector4[] rectangles, MeshMeta world, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, int[] ArrayOfInts, Tile[] tiles, int tilesX, int tilesY, int frameAlternate, int texWidth, int texHeight, Vector3 lightDir)
     {
         for (int i = 0; i < count; i++)
         {
@@ -1881,10 +1881,6 @@ public static class LevelFunctions
                             continue;
                         }
 
-                        tri.normal0 = processnormals[e];
-                        tri.normal1 = processnormals[e + 1];
-                        tri.normal2 = processnormals[e + 2];
-
                         tri.invz0 = processvertices[e].Z * invw0;
                         tri.invz1 = processvertices[e + 1].Z * invw1;
                         tri.invz2 = processvertices[e + 2].Z * invw2;
@@ -1915,12 +1911,45 @@ public static class LevelFunctions
                         tri.edgeB2 = tri.screen1.X - tri.screen0.X;
                         tri.edgeC2 = tri.screen0.X * tri.screen1.Y - tri.screen0.Y * tri.screen1.X;
 
+                        float a0 = tri.edgeA0 * tri.invArea;
+                        float a1 = tri.edgeA1 * tri.invArea; 
+                        float a2 = tri.edgeA2 * tri.invArea; 
+
+                        float b0 = tri.edgeB0 * tri.invArea;
+                        float b1 = tri.edgeB1 * tri.invArea;
+                        float b2 = tri.edgeB2 * tri.invArea;
+
                         tri.xmin = finalXmin;
                         tri.ymin = finalYmin;
                         tri.xmax = finalXmax;
                         tri.ymax = finalYmax;
 
+                        tri.invuv0.X = tri.invuv0.X * texWidth;
+                        tri.invuv0.Y = tri.invuv0.Y * texHeight;
+
+                        tri.invuv1.X = tri.invuv1.X * texWidth;
+                        tri.invuv1.Y = tri.invuv1.Y * texHeight;
+
+                        tri.invuv2.X = tri.invuv2.X * texWidth;
+                        tri.invuv2.Y = tri.invuv2.Y * texHeight;
+
+                        tri.invwx = a0 * tri.invw0 + a1 * tri.invw1 + a2 * tri.invw2;
+                        tri.invwy = b0 * tri.invw0 + b1 * tri.invw1 + b2 * tri.invw2;
+
+                        tri.invzx = a0 * tri.invz0 + a1 * tri.invz1 + a2 * tri.invz2;
+                        tri.invzy = b0 * tri.invz0 + b1 * tri.invz1 + b2 * tri.invz2;
+
+                        tri.invux = a0 * tri.invuv0.X + a1 * tri.invuv1.X + a2 * tri.invuv2.X;
+                        tri.invuy = b0 * tri.invuv0.X + b1 * tri.invuv1.X + b2 * tri.invuv2.X;
+
+                        tri.invvx = a0 * tri.invuv0.Y + a1 * tri.invuv1.Y + a2 * tri.invuv2.Y;
+                        tri.invvy = b0 * tri.invuv0.Y + b1 * tri.invuv1.Y + b2 * tri.invuv2.Y;
+
                         tri.triangleId = triangles.Count;
+
+                        float rawDiffuse = Vector3.Dot(processnormals[e], lightDir) * 0.5f + 0.5f;
+
+                        tri.diffuse = MathF.Min(1.0f, (rawDiffuse * rawDiffuse) + 0.2f);
 
                         int startTileX = Math.Clamp(tri.xmin / 8, 0, tilesX - 1);
                         int endTileX = Math.Clamp(tri.xmax / 8, 0, tilesX - 1);
@@ -1960,39 +1989,39 @@ public static class LevelFunctions
                                 float tileMaxX = tile.maxx;
                                 float tileMaxY = tile.maxy;
 
-                                float e0_c0 = n0X * tileMinX + n0Y * tileMinY + tri.edgeC0;
-                                float e0_c1 = n0X * tileMaxX + n0Y * tileMinY + tri.edgeC0;
-                                float e0_c2 = n0X * tileMinX + n0Y * tileMaxY + tri.edgeC0;
-                                float e0_c3 = n0X * tileMaxX + n0Y * tileMaxY + tri.edgeC0;
+                                float e0c0 = n0X * tileMinX + n0Y * tileMinY + tri.edgeC0;
+                                float e0c1 = n0X * tileMaxX + n0Y * tileMinY + tri.edgeC0;
+                                float e0c2 = n0X * tileMinX + n0Y * tileMaxY + tri.edgeC0;
+                                float e0c3 = n0X * tileMaxX + n0Y * tileMaxY + tri.edgeC0;
 
-                                if (e0_c0 > 0f && e0_c1 > 0f && e0_c2 > 0f && e0_c3 > 0f)
+                                if (e0c0 > 0f && e0c1 > 0f && e0c2 > 0f && e0c3 > 0f)
                                 {
                                     continue;
                                 }
 
-                                float e1_c0 = n1X * tileMinX + n1Y * tileMinY + tri.edgeC1;
-                                float e1_c1 = n1X * tileMaxX + n1Y * tileMinY + tri.edgeC1;
-                                float e1_c2 = n1X * tileMinX + n1Y * tileMaxY + tri.edgeC1;
-                                float e1_c3 = n1X * tileMaxX + n1Y * tileMaxY + tri.edgeC1;
+                                float e1c0 = n1X * tileMinX + n1Y * tileMinY + tri.edgeC1;
+                                float e1c1 = n1X * tileMaxX + n1Y * tileMinY + tri.edgeC1;
+                                float e1c2 = n1X * tileMinX + n1Y * tileMaxY + tri.edgeC1;
+                                float e1c3 = n1X * tileMaxX + n1Y * tileMaxY + tri.edgeC1;
 
-                                if (e1_c0 > 0f && e1_c1 > 0f && e1_c2 > 0f && e1_c3 > 0f)
+                                if (e1c0 > 0f && e1c1 > 0f && e1c2 > 0f && e1c3 > 0f)
                                 {
                                     continue;
                                 }
 
-                                float e2_c0 = n2X * tileMinX + n2Y * tileMinY + tri.edgeC2;
-                                float e2_c1 = n2X * tileMaxX + n2Y * tileMinY + tri.edgeC2;
-                                float e2_c2 = n2X * tileMinX + n2Y * tileMaxY + tri.edgeC2;
-                                float e2_c3 = n2X * tileMaxX + n2Y * tileMaxY + tri.edgeC2;
+                                float e2c0 = n2X * tileMinX + n2Y * tileMinY + tri.edgeC2;
+                                float e2c1 = n2X * tileMaxX + n2Y * tileMinY + tri.edgeC2;
+                                float e2c2 = n2X * tileMinX + n2Y * tileMaxY + tri.edgeC2;
+                                float e2c3 = n2X * tileMaxX + n2Y * tileMaxY + tri.edgeC2;
 
-                                if (e2_c0 > 0f && e2_c1 > 0f && e2_c2 > 0f && e2_c3 > 0f)
+                                if (e2c0 > 0f && e2c1 > 0f && e2c2 > 0f && e2c3 > 0f)
                                 {
                                     continue;
                                 }
 
-                                if (e0_c0 <= 0f && e0_c1 <= 0f && e0_c2 <= 0f && e0_c3 <= 0f &&
-                                    e1_c0 <= 0f && e1_c1 <= 0f && e1_c2 <= 0f && e1_c3 <= 0f &&
-                                    e2_c0 <= 0f && e2_c1 <= 0f && e2_c2 <= 0f && e2_c3 <= 0f)
+                                if (e0c0 <= 0f && e0c1 <= 0f && e0c2 <= 0f && e0c3 <= 0f &&
+                                    e1c0 <= 0f && e1c1 <= 0f && e1c2 <= 0f && e1c3 <= 0f &&
+                                    e2c0 <= 0f && e2c1 <= 0f && e2c2 <= 0f && e2c3 <= 0f)
                                 {
                                     if (intCount < 512)
                                     {
@@ -2003,8 +2032,8 @@ public static class LevelFunctions
                                     continue;
                                 }
 
-                                float p00 = e0_c0 - tri.edgeC0; float p01 = e0_c1 - tri.edgeC0;
-                                float p02 = e0_c2 - tri.edgeC0; float p03 = e0_c3 - tri.edgeC0;
+                                float p00 = e0c0 - tri.edgeC0; float p01 = e0c1 - tri.edgeC0;
+                                float p02 = e0c2 - tri.edgeC0; float p03 = e0c3 - tri.edgeC0;
                                 float tileMinProj0 = MathF.Min(MathF.Min(p00, p01), MathF.Min(p02, p03));
                                 float tileMaxProj0 = MathF.Max(MathF.Max(p00, p01), MathF.Max(p02, p03));
 
@@ -2013,8 +2042,8 @@ public static class LevelFunctions
                                     continue;
                                 }
 
-                                float p10 = e1_c0 - tri.edgeC1; float p11 = e1_c1 - tri.edgeC1;
-                                float p12 = e1_c2 - tri.edgeC1; float p13 = e1_c3 - tri.edgeC1;
+                                float p10 = e1c0 - tri.edgeC1; float p11 = e1c1 - tri.edgeC1;
+                                float p12 = e1c2 - tri.edgeC1; float p13 = e1c3 - tri.edgeC1;
                                 float tileMinProj1 = MathF.Min(MathF.Min(p10, p11), MathF.Min(p12, p13));
                                 float tileMaxProj1 = MathF.Max(MathF.Max(p10, p11), MathF.Max(p12, p13));
 
@@ -2023,8 +2052,8 @@ public static class LevelFunctions
                                     continue;
                                 }
 
-                                float p20 = e2_c0 - tri.edgeC2; float p21 = e2_c1 - tri.edgeC2;
-                                float p22 = e2_c2 - tri.edgeC2; float p23 = e2_c3 - tri.edgeC2;
+                                float p20 = e2c0 - tri.edgeC2; float p21 = e2c1 - tri.edgeC2;
+                                float p22 = e2c2 - tri.edgeC2; float p23 = e2c3 - tri.edgeC2;
                                 float tileMinProj2 = MathF.Min(MathF.Min(p20, p21), MathF.Min(p22, p23));
                                 float tileMaxProj2 = MathF.Max(MathF.Max(p20, p21), MathF.Max(p22, p23));
 
@@ -2049,320 +2078,117 @@ public static class LevelFunctions
         }
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
-    public static void DrawTiles(Tile[] tiles, int[] ArrayOfInts, List<Triangle> triangles, int Width, int Height, int texWidth, int texHeight, int maskX, int maskY, uint[] sampleTexture, uint[] backBuffer, float[] depthBuffer, Vector3 lightDir)
+    public static void DrawTiles(Tile[] tiles, int[] ArrayOfInts, List<Triangle> triangles, int Width, int Height, int texWidth, int texHeight, int maskX, int maskY, uint[] sampleTexture, uint[] backBuffer, float[] depthBuffer)
     {
-        if (Avx2.IsSupported)
+        int totalTiles = tiles.Length;
+        for (int t = 0; t < totalTiles; t++)
         {
-            ReadOnlySpan<uint> sampleTexSpan = sampleTexture;
-            Span<uint> backBufferSpan = backBuffer;
-            Span<float> depthBufferSpan = depthBuffer;
-
-            ref uint sampleTexRef = ref MemoryMarshal.GetReference(sampleTexSpan);
-            ref uint backBufferRef = ref MemoryMarshal.GetReference(backBufferSpan);
-            ref float depthBufferRef = ref MemoryMarshal.GetReference(depthBufferSpan);
-
-            int totalTiles = tiles.Length;
-
-            Vector256<float> vHalf = Vector256.Create(0.5f);
-            Vector256<float> vZero = Vector256.Create(0f);
-            Vector256<float> vOne = Vector256.Create(1.0f);
-            Vector256<float> vPointTwo = Vector256.Create(0.2f);
-            Vector256<float> vXOffsets = Vector256.Create(0f, 1f, 2f, 3f, 4f, 5f, 6f, 7f);
-            Vector256<int> vMaskX = Vector256.Create(maskX);
-            Vector256<int> vMaskY = Vector256.Create(maskY);
-            Vector256<int> vTexWidth = Vector256.Create(texWidth);
-            Vector256<float> vTexWidthF = Vector256.Create((float)texWidth);
-            Vector256<float> vTexHeightF = Vector256.Create((float)texHeight);
-            Vector256<int> v255 = Vector256.Create(255);
-
-            for (int t = 0; t < totalTiles; t++)
+            Tile tile = tiles[t];
+            if (tile.intsCount == 0)
             {
-                Tile tile = tiles[t];
-                if (tile.intsCount == 0)
-                {
-                    continue;
-                }
-
-                int tileMinX = tile.minx;
-                int tileMaxX = tile.maxx;
-                int tileMinY = tile.miny;
-                int tileMaxY = tile.maxy;
-
-                int startOffset = t * 512;
-
-                for (int bt = 0; bt < tile.intsCount; bt++)
-                {
-                    int triId = ArrayOfInts[startOffset + bt];
-                    Triangle tri = triangles[triId];
-
-                    int startY = Math.Max(tileMinY, tri.ymin);
-                    int endY = Math.Min(tileMaxY - 1, tri.ymax);
-                    int startX = Math.Max(tileMinX, tri.xmin);
-                    int endX = Math.Min(tileMaxX - 1, tri.xmax);
-
-                    if (startX > endX || startY > endY)
-                    {
-                        continue;
-                    }
-
-                    Vector256<float> vEdgeA0 = Vector256.Create(tri.edgeA0);
-                    Vector256<float> vEdgeB0 = Vector256.Create(tri.edgeB0);
-                    Vector256<float> vEdgeC0 = Vector256.Create(tri.edgeC0);
-
-                    Vector256<float> vEdgeA1 = Vector256.Create(tri.edgeA1);
-                    Vector256<float> vEdgeB1 = Vector256.Create(tri.edgeB1);
-                    Vector256<float> vEdgeC1 = Vector256.Create(tri.edgeC1);
-
-                    Vector256<float> vEdgeA2 = Vector256.Create(tri.edgeA2);
-                    Vector256<float> vEdgeB2 = Vector256.Create(tri.edgeB2);
-                    Vector256<float> vEdgeC2 = Vector256.Create(tri.edgeC2);
-
-                    Vector256<float> vInvArea = Vector256.Create(tri.invArea);
-                    Vector256<float> vInvw0 = Vector256.Create(tri.invw0);
-                    Vector256<float> vInvw1 = Vector256.Create(tri.invw1);
-                    Vector256<float> vInvw2 = Vector256.Create(tri.invw2);
-
-                    Vector256<float> vInvz0 = Vector256.Create(tri.invz0);
-                    Vector256<float> vInvz1 = Vector256.Create(tri.invz1);
-                    Vector256<float> vInvz2 = Vector256.Create(tri.invz2);
-
-                    Vector256<float> vLdirX = Vector256.Create(lightDir.X);
-                    Vector256<float> vLdirY = Vector256.Create(lightDir.Y);
-                    Vector256<float> vLdirZ = Vector256.Create(lightDir.Z);
-
-                    Vector256<float> vN0X = Vector256.Create(tri.normal0.X * tri.invw0);
-                    Vector256<float> vN0Y = Vector256.Create(tri.normal0.Y * tri.invw0);
-                    Vector256<float> vN0Z = Vector256.Create(tri.normal0.Z * tri.invw0);
-
-                    Vector256<float> vN1X = Vector256.Create(tri.normal1.X * tri.invw1);
-                    Vector256<float> vN1Y = Vector256.Create(tri.normal1.Y * tri.invw1);
-                    Vector256<float> vN1Z = Vector256.Create(tri.normal1.Z * tri.invw1);
-
-                    Vector256<float> vN2X = Vector256.Create(tri.normal2.X * tri.invw2);
-                    Vector256<float> vN2Y = Vector256.Create(tri.normal2.Y * tri.invw2);
-                    Vector256<float> vN2Z = Vector256.Create(tri.normal2.Z * tri.invw2);
-
-                    Vector256<float> vUv0X = Vector256.Create(tri.invuv0.X);
-                    Vector256<float> vUv0Y = Vector256.Create(tri.invuv0.Y);
-                    Vector256<float> vUv1X = Vector256.Create(tri.invuv1.X);
-                    Vector256<float> vUv1Y = Vector256.Create(tri.invuv1.Y);
-                    Vector256<float> vUv2X = Vector256.Create(tri.invuv2.X);
-                    Vector256<float> vUv2Y = Vector256.Create(tri.invuv2.Y);
-
-                    Vector256<int> vEndX = Vector256.Create(endX);
-
-                    Vector256<float> xBase = Fma.MultiplyAdd(vEdgeA0, vXOffsets, vEdgeC0);
-                    Vector256<float> xBase1 = Fma.MultiplyAdd(vEdgeA1, vXOffsets, vEdgeC1);
-                    Vector256<float> xBase2 = Fma.MultiplyAdd(vEdgeA2, vXOffsets, vEdgeC2);
-
-                    for (int y = startY; y <= endY; y++)
-                    {
-                        float pyScalar = y + 0.5f;
-                        Vector256<float> py = Vector256.Create(pyScalar);
-                        int rowOffset = y * Width;
-
-                        Vector256<float> yEdge0 = Fma.MultiplyAdd(vEdgeB0, py, xBase);
-                        Vector256<float> yEdge1 = Fma.MultiplyAdd(vEdgeB1, py, xBase1);
-                        Vector256<float> yEdge2 = Fma.MultiplyAdd(vEdgeB2, py, xBase2);
-
-                        float xStep0 = tri.edgeA0 * 8f;
-                        float xStep1 = tri.edgeA1 * 8f;
-                        float xStep2 = tri.edgeA2 * 8f;
-
-                        for (int x = startX; x <= endX; x += 8)
-                        {
-                            float xCurrentF = (float)x;
-                            Vector256<float> edge0 = Fma.MultiplyAdd(vEdgeA0, Vector256.Create(xCurrentF), yEdge0);
-                            Vector256<float> edge1 = Fma.MultiplyAdd(vEdgeA1, Vector256.Create(xCurrentF), yEdge1);
-                            Vector256<float> edge2 = Fma.MultiplyAdd(vEdgeA2, Vector256.Create(xCurrentF), yEdge2);
-
-                            Vector256<float> mEdge0 = Avx2.CompareLessThanOrEqual(edge0, vZero);
-                            Vector256<float> mEdge1 = Avx2.CompareLessThanOrEqual(edge1, vZero);
-                            Vector256<float> mEdge2 = Avx2.CompareLessThanOrEqual(edge2, vZero);
-                            Vector256<float> coverageMask = Avx2.And(Avx2.And(mEdge0, mEdge1), mEdge2);
-
-                            Vector256<float> px = Avx2.Add(Vector256.Create(xCurrentF), vXOffsets);
-                            Vector256<int> vXCoords = Avx.ConvertToVector256Int32(px);
-                            Vector256<int> boundsMask = Vector256.LessThanOrEqual(vXCoords, vEndX);
-                            coverageMask = Avx2.And(coverageMask, boundsMask.AsSingle());
-
-                            if (Avx2.MoveMask(coverageMask) == 0)
-                            {
-                                continue;
-                            }
-
-                            Vector256<float> w0 = Avx2.Multiply(edge0, vInvArea);
-                            Vector256<float> w1 = Avx2.Multiply(edge1, vInvArea);
-                            Vector256<float> w2 = Avx2.Multiply(edge2, vInvArea);
-
-                            Vector256<float> iweight = Fma.MultiplyAdd(w0, vInvw0, Fma.MultiplyAdd(w1, vInvw1, Avx2.Multiply(w2, vInvw2)));
-                            Vector256<float> invWeight = Avx2.Divide(vOne, iweight);
-                            Vector256<float> z = Avx2.Multiply(Fma.MultiplyAdd(w0, vInvz0, Fma.MultiplyAdd(w1, vInvz1, Avx2.Multiply(w2, vInvz2))), invWeight);
-
-                            int pBase = rowOffset + x;
-                            ref float depthPtr = ref Unsafe.Add(ref depthBufferRef, pBase);
-                            Vector256<float> currentDepth = Vector256.LoadUnsafe(ref depthPtr);
-                            Vector256<float> depthMask = Avx2.CompareLessThan(z, currentDepth);
-
-                            Vector256<float> finalMask = Avx2.And(coverageMask, depthMask);
-                            if (Avx2.MoveMask(finalMask) == 0)
-                            {
-                                continue;
-                            }
-
-                            Vector256<float> blendedDepth = Avx2.BlendVariable(currentDepth, z, finalMask);
-                            Vector256.StoreUnsafe(blendedDepth, ref depthPtr);
-
-                            Vector256<float> nX = Avx2.Multiply(Fma.MultiplyAdd(w0, vN0X, Fma.MultiplyAdd(w1, vN1X, Avx2.Multiply(w2, vN2X))), invWeight);
-                            Vector256<float> nY = Avx2.Multiply(Fma.MultiplyAdd(w0, vN0Y, Fma.MultiplyAdd(w1, vN1Y, Avx2.Multiply(w2, vN2Y))), invWeight);
-                            Vector256<float> nZ = Avx2.Multiply(Fma.MultiplyAdd(w0, vN0Z, Fma.MultiplyAdd(w1, vN1Z, Avx2.Multiply(w2, vN2Z))), invWeight);
-                            Vector256<float> lengthSq = Fma.MultiplyAdd(nX, nX, Fma.MultiplyAdd(nY, nY, Avx2.Multiply(nZ, nZ)));
-                            Vector256<float> invLength = Avx2.ReciprocalSqrt(lengthSq);
-                            nX = Avx2.Multiply(nX, invLength);
-                            nY = Avx2.Multiply(nY, invLength);
-                            nZ = Avx2.Multiply(nZ, invLength);
-                            Vector256<float> dot = Fma.MultiplyAdd(nX, vLdirX, Fma.MultiplyAdd(nY, vLdirY, Avx2.Multiply(nZ, vLdirZ)));
-                            Vector256<float> diffuse = Fma.MultiplyAdd(dot, vHalf, vHalf);
-                            diffuse = Avx2.Min(vOne, Fma.MultiplyAdd(diffuse, diffuse, vPointTwo));
-                            Vector256<float> uvX = Avx2.Multiply(Fma.MultiplyAdd(w0, vUv0X, Fma.MultiplyAdd(w1, vUv1X, Avx2.Multiply(w2, vUv2X))), invWeight);
-                            Vector256<float> uvY = Avx2.Multiply(Fma.MultiplyAdd(w0, vUv0Y, Fma.MultiplyAdd(w1, vUv1Y, Avx2.Multiply(w2, vUv2Y))), invWeight);
-
-                            Vector256<int> tx = Avx.ConvertToVector256Int32(Avx2.Floor(Avx2.Multiply(uvX, vTexWidthF))) & vMaskX;
-                            Vector256<int> ty = Avx.ConvertToVector256Int32(Avx2.Floor(Avx2.Multiply(uvY, vTexHeightF))) & vMaskY;
-
-                            Vector256<int> texIndices = (ty * vTexWidth) + tx;
-
-                            Vector256<int> col = Vector256.Create(
-                                (int)Unsafe.Add(ref sampleTexRef, (nint)texIndices.GetElement(0)),
-                                (int)Unsafe.Add(ref sampleTexRef, (nint)texIndices.GetElement(1)),
-                                (int)Unsafe.Add(ref sampleTexRef, (nint)texIndices.GetElement(2)),
-                                (int)Unsafe.Add(ref sampleTexRef, (nint)texIndices.GetElement(3)),
-                                (int)Unsafe.Add(ref sampleTexRef, (nint)texIndices.GetElement(4)),
-                                (int)Unsafe.Add(ref sampleTexRef, (nint)texIndices.GetElement(5)),
-                                (int)Unsafe.Add(ref sampleTexRef, (nint)texIndices.GetElement(6)),
-                                (int)Unsafe.Add(ref sampleTexRef, (nint)texIndices.GetElement(7))
-                            );
-
-                            Vector256<float> r = Avx2.Multiply(Avx.ConvertToVector256Single(col & v255), diffuse);
-                            Vector256<float> g = Avx2.Multiply(Avx.ConvertToVector256Single(Avx2.ShiftRightLogical(col, 8) & v255), diffuse);
-                            Vector256<float> b = Avx2.Multiply(Avx.ConvertToVector256Single(Avx2.ShiftRightLogical(col, 16) & v255), diffuse);
-
-                            Vector256<int> a = Avx2.ShiftRightLogical(col, 24) & v255;
-
-                            Vector256<int> rInt = Avx.ConvertToVector256Int32(r);
-                            Vector256<int> gInt = Avx.ConvertToVector256Int32(g);
-                            Vector256<int> bInt = Avx.ConvertToVector256Int32(b);
-
-                            Vector256<int> finalCol = rInt |
-                                                      Avx2.ShiftLeftLogical(gInt, 8) |
-                                                      Avx2.ShiftLeftLogical(bInt, 16) |
-                                                      Avx2.ShiftLeftLogical(a, 24);
-
-                            ref uint backBufferPtr = ref Unsafe.Add(ref backBufferRef, pBase);
-
-                            Vector256<int> currentBuffer = Vector256.LoadUnsafe(ref backBufferPtr).AsInt32();
-                            Vector256<int> blendedCol = Avx2.BlendVariable(currentBuffer, finalCol, finalMask.AsInt32());
-
-                            Vector256.StoreUnsafe(blendedCol.AsUInt32(), ref backBufferPtr);
-                        }
-                    }
-                }
+                continue;
             }
-        }
-        else
-        {
-            int totalTiles = tiles.Length;
-            for (int t = 0; t < totalTiles; t++)
+
+            int tileMinX = tile.minx;
+            int tileMaxX = tile.maxx;
+            int tileMinY = tile.miny;
+            int tileMaxY = tile.maxy;
+
+            int startOffset = t * 512;
+
+            for (int bt = 0; bt < tile.intsCount; bt++)
             {
-                Tile tile = tiles[t];
-                if (tile.intsCount == 0)
+                int triId = ArrayOfInts[startOffset + bt];
+                Triangle tri = triangles[triId];
+
+                int startY = Math.Max(tileMinY, tri.ymin);
+                int endY = Math.Min(tileMaxY - 1, tri.ymax);
+                int startX = Math.Max(tileMinX, tri.xmin);
+                int endX = Math.Min(tileMaxX - 1, tri.xmax);
+
+                if (startX > endX || startY > endY)
                 {
                     continue;
                 }
 
-                int tileMinX = tile.minx;
-                int tileMaxX = tile.maxx;
-                int tileMinY = tile.miny;
-                int tileMaxY = tile.maxy;
+                float startPx = startX + 0.5f;
+                float startPy = startY + 0.5f;
 
-                int startOffset = t * 512;
+                float edgeRow0 = tri.edgeA0 * startPx + tri.edgeB0 * startPy + tri.edgeC0;
+                float edgeRow1 = tri.edgeA1 * startPx + tri.edgeB1 * startPy + tri.edgeC1;
+                float edgeRow2 = tri.edgeA2 * startPx + tri.edgeB2 * startPy + tri.edgeC2;
 
-                for (int bt = 0; bt < tile.intsCount; bt++)
+                float startW0 = edgeRow0 * tri.invArea;
+                float startW1 = edgeRow1 * tri.invArea;
+                float startW2 = edgeRow2 * tri.invArea;
+
+                float rowW = startW0 * tri.invw0 + startW1 * tri.invw1 + startW2 * tri.invw2;
+                float rowZ = startW0 * tri.invz0 + startW1 * tri.invz1 + startW2 * tri.invz2;
+                float rowU = startW0 * tri.invuv0.X + startW1 * tri.invuv1.X + startW2 * tri.invuv2.X;
+                float rowV = startW0 * tri.invuv0.Y + startW1 * tri.invuv1.Y + startW2 * tri.invuv2.Y;
+
+                float diffuse = tri.diffuse;
+
+                for (int y = startY; y <= endY; y++)
                 {
-                    int triId = ArrayOfInts[startOffset + bt];
-                    Triangle tri = triangles[triId];
+                    int p = y * Width + startX;
 
-                    int startY = Math.Max(tileMinY, tri.ymin);
-                    int endY = Math.Min(tileMaxY - 1, tri.ymax);
-                    int startX = Math.Max(tileMinX, tri.xmin);
-                    int endX = Math.Min(tileMaxX - 1, tri.xmax);
+                    float edge0 = edgeRow0;
+                    float edge1 = edgeRow1;
+                    float edge2 = edgeRow2;
 
-                    if (startX > endX || startY > endY)
+                    float incW = rowW;
+                    float incZ = rowZ;
+                    float incU = rowU;
+                    float incV = rowV;
+
+                    for (int x = startX; x <= endX; x++)
                     {
-                        continue;
-                    }
-
-                    for (int y = startY; y <= endY; y++)
-                    {
-                        float py = y + 0.5f;
-                        int rowOffset = y * Width;
-
-                        for (int x = startX; x <= endX; x++)
+                        if (edge0 <= 0f && edge1 <= 0f && edge2 <= 0f)
                         {
-                            float px = x + 0.5f;
-                            int p = rowOffset + x;
+                            float invWeight = 1.0f / incW;
+                            float z = incZ * invWeight;
 
-                            float edge0 = tri.edgeA0 * px + tri.edgeB0 * py + tri.edgeC0;
-                            float edge1 = tri.edgeA1 * px + tri.edgeB1 * py + tri.edgeC1;
-                            float edge2 = tri.edgeA2 * px + tri.edgeB2 * py + tri.edgeC2;
-
-                            if (edge0 > 0f || edge1 > 0f || edge2 > 0f)
+                            if (z < depthBuffer[p])
                             {
-                                continue;
+                                depthBuffer[p] = z;
+
+                                float texX = incU * invWeight;
+                                float texY = incV * invWeight;
+
+                                int tx = ((int)texX - (texX < 0 ? 1 : 0)) & maskX;
+                                int ty = ((int)texY - (texY < 0 ? 1 : 0)) & maskY;
+
+                                uint col = sampleTexture[ty * texWidth + tx];
+
+                                byte r = (byte)Math.Clamp(((col >> 0) & 255) * diffuse, 0, 255);
+                                byte g = (byte)Math.Clamp(((col >> 8) & 255) * diffuse, 0, 255);
+                                byte b = (byte)Math.Clamp(((col >> 16) & 255) * diffuse, 0, 255);
+                                byte a = (byte)((col >> 24) & 255);
+
+                                backBuffer[p] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
                             }
-
-                            float weight0 = edge0 * tri.invArea;
-                            float weight1 = edge1 * tri.invArea;
-                            float weight2 = edge2 * tri.invArea;
-
-                            float iweight = weight0 * tri.invw0 + weight1 * tri.invw1 + weight2 * tri.invw2;
-                            float invWeight = 1.0f / iweight;
-
-                            float z = (weight0 * tri.invz0 + weight1 * tri.invz1 + weight2 * tri.invz2) * invWeight;
-
-                            if (z >= depthBuffer[p])
-                            {
-                                continue;
-                            }
-
-                            depthBuffer[p] = z;
-
-                            Vector3 normal = (weight0 * tri.normal0 * tri.invw0 +
-                                              weight1 * tri.normal1 * tri.invw1 +
-                                              weight2 * tri.normal2 * tri.invw2) * invWeight;
-                            Vector3 N = Vector3.Normalize(normal);
-                            float diffuse = Vector3.Dot(N, lightDir) * 0.5f + 0.5f;
-                            diffuse = MathF.Min(1.0f, (diffuse * diffuse) + 0.2f);
-
-                            Vector2 uv = (weight0 * tri.invuv0 + weight1 * tri.invuv1 + weight2 * tri.invuv2) * invWeight;
-
-                            float texX = uv.X * texWidth;
-                            float texY = uv.Y * texHeight;
-
-                            int tx = ((int)texX - (texX < 0 ? 1 : 0)) & maskX;
-                            int ty = ((int)texY - (texY < 0 ? 1 : 0)) & maskY;
-
-                            uint col = sampleTexture[ty * texWidth + tx];
-
-                            byte r = (byte)Math.Clamp(((col >> 0) & 255) * diffuse, 0, 255);
-                            byte g = (byte)Math.Clamp(((col >> 8) & 255) * diffuse, 0, 255);
-                            byte b = (byte)Math.Clamp(((col >> 16) & 255) * diffuse, 0, 255);
-                            byte a = (byte)((col >> 24) & 255);
-
-                            backBuffer[p] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
                         }
+
+                        edge0 += tri.edgeA0;
+                        edge1 += tri.edgeA1;
+                        edge2 += tri.edgeA2;
+
+                        incW += tri.invwx;
+                        incZ += tri.invzx;
+                        incU += tri.invux;
+                        incV += tri.invvx;
+                        p += 1;
                     }
+
+                    edgeRow0 += tri.edgeB0;
+                    edgeRow1 += tri.edgeB1;
+                    edgeRow2 += tri.edgeB2;
+
+                    rowW += tri.invwy;
+                    rowZ += tri.invzy;
+                    rowU += tri.invuy;
+                    rowV += tri.invvy;
                 }
             }
         }

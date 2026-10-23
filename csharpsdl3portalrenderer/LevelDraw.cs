@@ -264,7 +264,6 @@ public static class LevelDraw
 
         ListOfSectorLists = MakeLists();
         ArrayOfInts = new int[tiles.Length * 512];
-
         ArrayOfRectangleArrays = ArrayOfArraysMake(TopLevelLists.sectors);
         visibleSectors = VisibleSectorsMake(TopLevelLists.sectors);
         contactingSectors = contactSectorsMake(TopLevelLists.sectors);
@@ -345,12 +344,12 @@ public static class LevelDraw
             processbool, processvertices, temporaryvertices,
             processtextures, temporarytextures,
             processnormals, temporarynormals,
-            Triangles, Camera3D.ViewProjectionMatrix, Width, Height, ArrayOfInts, tiles, tilesX, tilesY, frameAlternate
+            Triangles, Camera3D.ViewProjectionMatrix, Width, Height, ArrayOfInts, tiles, tilesX, tilesY, frameAlternate, texWidth, texHeight, lightDir
             );
             Array.Fill(depthBuffer, float.PositiveInfinity);
             Array.Clear(backBuffer, 0, backBuffer.Length);
             
-            DrawTiles(tiles, ArrayOfInts, Triangles, Width, Height, texWidth, texHeight, maskX, maskY, sampleTexture, backBuffer, depthBuffer, lightDir);
+            DrawTiles(tiles, ArrayOfInts, Triangles, Width, Height, texWidth, texHeight, maskX, maskY, sampleTexture, backBuffer, depthBuffer);
             
             ReadOnlySpan<byte> pixelBytes = MemoryMarshal.AsBytes(backBuffer.AsSpan());
             SDL.UpdateTexture(streamingTexture, IntPtr.Zero, pixelBytes, Width * sizeof(uint));
