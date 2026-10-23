@@ -560,15 +560,7 @@ public static class LevelFunctions
 
     public static void LoadFromFile(string read, List<Vector2> vertices, List<Sector> sectors, List<StartSector> starts)
     {
-        string path = Path.GetFullPath(read);
-
-        if (!File.Exists(path))
-        {
-            Console.WriteLine("File not found!");
-            return;
-        }
-
-        string text = File.ReadAllText(path);
+        string text = File.ReadAllText(read);
 
         string[] lines = text.Split('\n');
 

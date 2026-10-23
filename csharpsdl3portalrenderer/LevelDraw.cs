@@ -241,7 +241,31 @@ public static class LevelDraw
 
     static void Main(string[] args)
     {
-        LoadFromFile("assets/twohallways-clear.txt", vertices, sectors, starts);
+        string levelPath = Path.GetFullPath("assets/twohallways-clear.txt");
+
+        if (!File.Exists(levelPath))
+        {
+            Console.WriteLine("Level file not found!");
+            return;
+        }
+
+        string sdl3Path = Path.GetFullPath("SDL3.dll");
+
+        if (!File.Exists(sdl3Path))
+        {
+            Console.WriteLine("SDL 3 not found!");
+            return;
+        }
+
+        string csSDL3Path = Path.GetFullPath("SDL3-CS.dll");
+
+        if (!File.Exists(csSDL3Path))
+        {
+            Console.WriteLine("SDL 3 Sharp not found!");
+            return;
+        }
+
+        LoadFromFile(levelPath, vertices, sectors, starts);
 
         BuildObjects(starts, sectors, TopLevelLists.positions);
 
