@@ -5,10 +5,10 @@ using static LevelFunctions;
 
 public static class LevelDraw
 {
-    private const int Width = 640;
-    private const int Height = 360;
+    private const int Width = 960;
+    private const int Height = 540;
     private const int tileSizeX = 8;
-    private const int tileSizeY = 8;
+    private const int tileSizeY = 9;
     private const int tilesX = Width / tileSizeX;
     private const int tilesY = Height / tileSizeY;
 
@@ -260,10 +260,10 @@ public static class LevelDraw
 
         CurrentSector = PlayerStart(TopLevelLists.positions, TopLevelLists.sectors, rng, ref playerStartPosition);
 
-        InitializeTiles(tilesX, tilesY, tiles);
+        InitializeTiles(tilesX, tilesY, tileSizeX, tileSizeY, tiles);
 
         ListOfSectorLists = MakeLists();
-        ArrayOfInts = new int[tiles.Length * 512];
+        ArrayOfInts = new int[tiles.Length * 128];
         ArrayOfRectangleArrays = ArrayOfArraysMake(TopLevelLists.sectors);
         visibleSectors = VisibleSectorsMake(TopLevelLists.sectors);
         contactingSectors = contactSectorsMake(TopLevelLists.sectors);
@@ -344,7 +344,7 @@ public static class LevelDraw
             processbool, processvertices, temporaryvertices,
             processtextures, temporarytextures,
             processnormals, temporarynormals,
-            Triangles, Camera3D.ViewProjectionMatrix, Width, Height, ArrayOfInts, tiles, tilesX, tilesY, frameAlternate, texWidth, texHeight, lightDir
+            Triangles, Camera3D.ViewProjectionMatrix, Width, Height, ArrayOfInts, tiles, tilesX, tilesY, frameAlternate, texWidth, texHeight, tileSizeX, tileSizeY, lightDir
             );
             Array.Fill(depthBuffer, float.PositiveInfinity);
             Array.Clear(backBuffer, 0, backBuffer.Length);

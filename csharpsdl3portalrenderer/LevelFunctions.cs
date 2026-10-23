@@ -117,7 +117,7 @@ public struct Tile
 
 public static class LevelFunctions
 {
-    public static void InitializeTiles(int tilesX, int tilesY, Tile[] tiles)
+    public static void InitializeTiles(int tilesX, int tilesY, int tileSizeX, int tileSizeY, Tile[] tiles)
     {
         for (int y = 0; y < tilesY; y++)
         {
@@ -128,10 +128,10 @@ public static class LevelFunctions
                 tiles[index] = new Tile
                 {
                     frameFlag = 0,
-                    minx = x * 8,
-                    miny = y * 8,
-                    maxx = (x + 1) * 8,
-                    maxy = (y + 1) * 8,
+                    minx = x * tileSizeX,
+                    miny = y * tileSizeY,
+                    maxx = (x + 1) * tileSizeX,
+                    maxy = (y + 1) * tileSizeY,
                     intsCount = 0
                 };
             }
@@ -319,7 +319,7 @@ public static class LevelFunctions
         }
     }
 
-    public static void SetTriangles(int[] visibleSectors, List<MeshMeta> meshes, Vector4[][] ArrayOfRectangleArrays, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, int[] ArrayOfInts, Tile[] tiles, int tilesX, int tilesY, int frameAlternate, int texWidth, int texHeight, Vector3 lightDir)
+    public static void SetTriangles(int[] visibleSectors, List<MeshMeta> meshes, Vector4[][] ArrayOfRectangleArrays, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, int[] ArrayOfInts, Tile[] tiles, int tilesX, int tilesY, int frameAlternate, int texWidth, int texHeight, int tileSizeX, int tileSizeY, Vector3 lightDir)
     {
         for (int a = 0; a < visibleSectors.Length; a++)
         {
@@ -334,7 +334,7 @@ public static class LevelFunctions
 
             Vector4[] rectanglesArray = ArrayOfRectangleArrays[a];
 
-            ClipTrianglesWithRectangles(count, rectanglesArray, mesh, vertices, textures, normals, indices, CamPosition, processbool, processvertices, temporaryvertices, processtextures, temporarytextures, processnormals, temporarynormals, triangles, CamViewProj, Width, Height, ArrayOfInts, tiles, tilesX, tilesY, frameAlternate, texWidth, texHeight, lightDir);
+            ClipTrianglesWithRectangles(count, rectanglesArray, mesh, vertices, textures, normals, indices, CamPosition, processbool, processvertices, temporaryvertices, processtextures, temporarytextures, processnormals, temporarynormals, triangles, CamViewProj, Width, Height, ArrayOfInts, tiles, tilesX, tilesY, frameAlternate, texWidth, texHeight, tileSizeX, tileSizeY, lightDir);
         }
     }
 
@@ -1520,7 +1520,7 @@ public static class LevelFunctions
         return new Vector4(xmin, ymin, xmax, ymax);
     }
 
-    public static void ClipTrianglesWithRectangles(int count, Vector4[] rectangles, MeshMeta world, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, int[] ArrayOfInts, Tile[] tiles, int tilesX, int tilesY, int frameAlternate, int texWidth, int texHeight, Vector3 lightDir)
+    public static void ClipTrianglesWithRectangles(int count, Vector4[] rectangles, MeshMeta world, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, int[] ArrayOfInts, Tile[] tiles, int tilesX, int tilesY, int frameAlternate, int texWidth, int texHeight, int tileSizeX, int tileSizeY, Vector3 lightDir)
     {
         for (int i = 0; i < count; i++)
         {
@@ -1949,12 +1949,14 @@ public static class LevelFunctions
 
                         float rawDiffuse = Vector3.Dot(processnormals[e], lightDir) * 0.5f + 0.5f;
 
-                        tri.diffuse = MathF.Min(1.0f, (rawDiffuse * rawDiffuse) + 0.2f);
+                        rawDiffuse = MathF.Min(1.0f, (rawDiffuse * rawDiffuse) + 0.2f);
 
-                        int startTileX = Math.Clamp(tri.xmin / 8, 0, tilesX - 1);
-                        int endTileX = Math.Clamp(tri.xmax / 8, 0, tilesX - 1);
-                        int startTileY = Math.Clamp(tri.ymin / 8, 0, tilesY - 1);
-                        int endTileY = Math.Clamp(tri.ymax / 8, 0, tilesY - 1);
+                        tri.diffuse = Math.Clamp(rawDiffuse, 0.0f, 1.0f);
+
+                        int startTileX = Math.Clamp(tri.xmin / tileSizeX, 0, tilesX - 1);
+                        int endTileX = Math.Clamp(tri.xmax / tileSizeX, 0, tilesX - 1);
+                        int startTileY = Math.Clamp(tri.ymin / tileSizeY, 0, tilesY - 1);
+                        int endTileY = Math.Clamp(tri.ymax / tileSizeY, 0, tilesY - 1);
 
                         float n0X = tri.edgeA0; float n0Y = tri.edgeB0;
                         float n1X = tri.edgeA1; float n1Y = tri.edgeB1;
@@ -2023,9 +2025,9 @@ public static class LevelFunctions
                                     e1c0 <= 0f && e1c1 <= 0f && e1c2 <= 0f && e1c3 <= 0f &&
                                     e2c0 <= 0f && e2c1 <= 0f && e2c2 <= 0f && e2c3 <= 0f)
                                 {
-                                    if (intCount < 512)
+                                    if (intCount < 128)
                                     {
-                                        int destIndex = (tileIndex * 512) + intCount;
+                                        int destIndex = (tileIndex * 128) + intCount;
                                         ArrayOfInts[destIndex] = tri.triangleId;
                                         tiles[tileIndex].intsCount++;
                                     }
@@ -2062,9 +2064,9 @@ public static class LevelFunctions
                                     continue;
                                 }
 
-                                if (intCount < 512)
+                                if (intCount < 128)
                                 {
-                                    int destIndex = (tileIndex * 512) + intCount;
+                                    int destIndex = (tileIndex * 128) + intCount;
                                     ArrayOfInts[destIndex] = tri.triangleId;
                                     tiles[tileIndex].intsCount++;
                                 }
@@ -2094,7 +2096,7 @@ public static class LevelFunctions
             int tileMinY = tile.miny;
             int tileMaxY = tile.maxy;
 
-            int startOffset = t * 512;
+            int startOffset = t * 128;
 
             for (int bt = 0; bt < tile.intsCount; bt++)
             {
@@ -2127,7 +2129,7 @@ public static class LevelFunctions
                 float rowU = startW0 * tri.invuv0.X + startW1 * tri.invuv1.X + startW2 * tri.invuv2.X;
                 float rowV = startW0 * tri.invuv0.Y + startW1 * tri.invuv1.Y + startW2 * tri.invuv2.Y;
 
-                float diffuse = Math.Clamp(tri.diffuse, 0.0f, 1.0f);
+                float diffuse = tri.diffuse;
 
                 for (int y = startY; y <= endY; y++)
                 {
