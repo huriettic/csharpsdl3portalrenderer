@@ -2127,7 +2127,7 @@ public static class LevelFunctions
                 float rowU = startW0 * tri.invuv0.X + startW1 * tri.invuv1.X + startW2 * tri.invuv2.X;
                 float rowV = startW0 * tri.invuv0.Y + startW1 * tri.invuv1.Y + startW2 * tri.invuv2.Y;
 
-                float diffuse = tri.diffuse;
+                float diffuse = Math.Clamp(tri.diffuse, 0.0f, 1.0f);
 
                 for (int y = startY; y <= endY; y++)
                 {
@@ -2161,9 +2161,9 @@ public static class LevelFunctions
 
                                 uint col = sampleTexture[ty * texWidth + tx];
 
-                                byte r = (byte)Math.Clamp(((col >> 0) & 255) * diffuse, 0, 255);
-                                byte g = (byte)Math.Clamp(((col >> 8) & 255) * diffuse, 0, 255);
-                                byte b = (byte)Math.Clamp(((col >> 16) & 255) * diffuse, 0, 255);
+                                byte r = (byte)(((col >> 0) & 255) * diffuse);
+                                byte g = (byte)(((col >> 8) & 255) * diffuse);
+                                byte b = (byte)(((col >> 16) & 255) * diffuse);
                                 byte a = (byte)((col >> 24) & 255);
 
                                 backBuffer[p] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
