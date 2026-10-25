@@ -8,7 +8,7 @@ public static class LevelDraw
     private const int Width = 960;
     private const int Height = 540;
     private const int tileSizeX = 8;
-    private const int tileSizeY = 9;
+    private const int tileSizeY = 4;
     private const int tilesX = Width / tileSizeX;
     private const int tilesY = Height / tileSizeY;
 
@@ -372,7 +372,7 @@ public static class LevelDraw
             );
             Array.Fill(depthBuffer, float.PositiveInfinity);
             Array.Clear(backBuffer, 0, backBuffer.Length);
-            
+
             DrawTiles(tiles, ArrayOfInts, Triangles, Width, Height, texWidth, texHeight, maskX, maskY, sampleTexture, backBuffer, depthBuffer);
             
             ReadOnlySpan<byte> pixelBytes = MemoryMarshal.AsBytes(backBuffer.AsSpan());

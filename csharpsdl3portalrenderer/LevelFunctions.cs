@@ -1,4 +1,8 @@
 ﻿using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 
 public struct Triangle
 {
@@ -2072,117 +2076,263 @@ public static class LevelFunctions
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
     public static void DrawTiles(Tile[] tiles, int[] ArrayOfInts, List<Triangle> triangles, int Width, int Height, int texWidth, int texHeight, int maskX, int maskY, uint[] sampleTexture, uint[] backBuffer, float[] depthBuffer)
     {
-        int totalTiles = tiles.Length;
-        for (int t = 0; t < totalTiles; t++)
+        if (Avx2.IsSupported)
         {
-            Tile tile = tiles[t];
-            if (tile.intsCount == 0)
+            int totalTiles = tiles.Length;
+            int maxMemoryIndex = Width * Height;
+
+            Vector256<int> v_xIndices = Vector256.Create(0, 1, 2, 3, 4, 5, 6, 7);
+            Vector256<float> v_laneSteps = Vector256.Create(0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f);
+            Vector256<float> v_zero = Vector256<float>.Zero;
+            Vector256<float> v_one = Vector256.Create(1.0f);
+            Vector256<int> v_maskX = Vector256.Create(maskX);
+            Vector256<int> v_maskY = Vector256.Create(maskY);
+            Vector256<int> v_texWidth = Vector256.Create(texWidth);
+            Vector256<uint> v_channelMask = Vector256.Create(255u);
+
+            ref float depthBufferRef = ref MemoryMarshal.GetArrayDataReference(depthBuffer);
+            ref uint backBufferRef = ref MemoryMarshal.GetArrayDataReference(backBuffer);
+            ref int arrayOfIntsRef = ref MemoryMarshal.GetArrayDataReference(ArrayOfInts);
+            ref uint sampleTexRef = ref MemoryMarshal.GetArrayDataReference(sampleTexture);
+
+            for (int t = 0; t < totalTiles; t++)
             {
-                continue;
+                Tile tile = tiles[t];
+                if (tile.intsCount == 0) continue;
+
+                int tileMinX = tile.minx;
+                int tileMaxX = tile.maxx;
+                int tileMinY = tile.miny;
+                int tileMaxY = tile.maxy;
+                int startOffset = t * 128;
+
+                Vector256<int> v_tileXInt = Vector256.Create(tileMinX) + v_xIndices;
+                Vector256<int> v_startX = Vector256.Create(Math.Max(tileMinX, tile.minx));
+                Vector256<int> v_endX = Vector256.Create(Math.Min(tileMaxX - 1, tile.maxx));
+                Vector256<int> v_bboxMask = Vector256.GreaterThanOrEqual(v_tileXInt, v_startX) & Vector256.LessThanOrEqual(v_tileXInt, v_endX);
+
+                for (int bt = 0; bt < tile.intsCount; bt++)
+                {
+                    int triId = Unsafe.Add(ref arrayOfIntsRef, startOffset + bt);
+                    Triangle tri = triangles[triId];
+
+                    int startY = Math.Max(tileMinY, tri.ymin);
+                    int endY = Math.Min(tileMaxY - 1, tri.ymax);
+                    int startX = Math.Max(tileMinX, tri.xmin);
+                    int endX = Math.Min(tileMaxX - 1, tri.xmax);
+
+                    if (startX > endX || startY > endY) continue;
+
+                    Vector256<float> v_startPx = Vector256.Create(tileMinX + 0.5f);
+                    Vector256<float> v_startPy = Vector256.Create(startY + 0.5f);
+
+                    Vector256<float> v_edgeRow0 = (Vector256.Create(tri.edgeA0) * v_startPx) + (Vector256.Create(tri.edgeB0) * v_startPy) + Vector256.Create(tri.edgeC0);
+                    Vector256<float> v_edgeRow1 = (Vector256.Create(tri.edgeA1) * v_startPx) + (Vector256.Create(tri.edgeB1) * v_startPy) + Vector256.Create(tri.edgeC1);
+                    Vector256<float> v_edgeRow2 = (Vector256.Create(tri.edgeA2) * v_startPx) + (Vector256.Create(tri.edgeB2) * v_startPy) + Vector256.Create(tri.edgeC2);
+
+                    Vector256<float> v_invArea = Vector256.Create(tri.invArea);
+                    Vector256<float> v_startW0 = v_edgeRow0 * v_invArea;
+                    Vector256<float> v_startW1 = v_edgeRow1 * v_invArea;
+                    Vector256<float> v_startW2 = v_edgeRow2 * v_invArea;
+
+                    Vector256<float> v_baseW = (v_startW0 * Vector256.Create(tri.invw0)) + (v_startW1 * Vector256.Create(tri.invw1)) + (v_startW2 * Vector256.Create(tri.invw2));
+                    Vector256<float> v_baseZ = (v_startW0 * Vector256.Create(tri.invz0)) + (v_startW1 * Vector256.Create(tri.invz1)) + (v_startW2 * Vector256.Create(tri.invz2));
+                    Vector256<float> v_baseU = (v_startW0 * Vector256.Create(tri.invuv0.X)) + (v_startW1 * Vector256.Create(tri.invuv1.X)) + (v_startW2 * Vector256.Create(tri.invuv2.X));
+                    Vector256<float> v_baseV = (v_startW0 * Vector256.Create(tri.invuv0.Y)) + (v_startW1 * Vector256.Create(tri.invuv1.Y)) + (v_startW2 * Vector256.Create(tri.invuv2.Y));
+
+                    Vector256<float> v_edgeA0 = Vector256.Create(tri.edgeA0); Vector256<float> v_edgeB0 = Vector256.Create(tri.edgeB0);
+                    Vector256<float> v_edgeA1 = Vector256.Create(tri.edgeA1); Vector256<float> v_edgeB1 = Vector256.Create(tri.edgeB1);
+                    Vector256<float> v_edgeA2 = Vector256.Create(tri.edgeA2); Vector256<float> v_edgeB2 = Vector256.Create(tri.edgeB2);
+
+                    Vector256<float> v_invwx = Vector256.Create(tri.invwx); Vector256<float> v_invwy = Vector256.Create(tri.invwy);
+                    Vector256<float> v_invzx = Vector256.Create(tri.invzx); Vector256<float> v_invzy = Vector256.Create(tri.invzy);
+                    Vector256<float> v_invux = Vector256.Create(tri.invux); Vector256<float> v_invuy = Vector256.Create(tri.invuy);
+                    Vector256<float> v_invvx = Vector256.Create(tri.invvx); Vector256<float> v_invvy = Vector256.Create(tri.invvy);
+
+                    Vector256<uint> v_diffuse = Vector256.Create((uint)(tri.diffuse * 255.0f));
+
+                    for (int y = startY; y <= endY; y++)
+                    {
+                        int memoryOffset = y * Width + tileMinX;
+                        if (memoryOffset < 0 || memoryOffset >= maxMemoryIndex) continue;
+
+                        Vector256<float> v_edge0 = v_edgeRow0 + (v_edgeA0 * v_laneSteps);
+                        Vector256<float> v_edge1 = v_edgeRow1 + (v_edgeA1 * v_laneSteps);
+                        Vector256<float> v_edge2 = v_edgeRow2 + (v_edgeA2 * v_laneSteps);
+
+                        Vector256<int> mask0 = Vector256.LessThanOrEqual(v_edge0, v_zero).AsInt32();
+                        Vector256<int> mask1 = Vector256.LessThanOrEqual(v_edge1, v_zero).AsInt32();
+                        Vector256<int> mask2 = Vector256.LessThanOrEqual(v_edge2, v_zero).AsInt32();
+
+                        Vector256<int> v_executionMask = v_bboxMask & mask0 & mask1 & mask2;
+                        if (v_executionMask == Vector256<int>.Zero) goto NextRow;
+
+                        Vector256<float> v_incW = v_baseW + (v_invwx * v_laneSteps);
+                        Vector256<float> v_incZ = v_baseZ + (v_invzx * v_laneSteps);
+                        Vector256<float> v_invWeight = v_one / v_incW;
+                        Vector256<float> v_calculatedZ = v_incZ * v_invWeight;
+
+                        Vector256<float> v_currentDepth = Vector256.LoadUnsafe(ref depthBufferRef, (uint)memoryOffset);
+                        v_executionMask &= Vector256.LessThan(v_calculatedZ, v_currentDepth).AsInt32();
+                        if (v_executionMask == Vector256<int>.Zero) goto NextRow;
+
+                        Vector256<float> v_incU = v_baseU + (v_invux * v_laneSteps);
+                        Vector256<float> v_incV = v_baseV + (v_invvx * v_laneSteps);
+
+                        Vector256<int> v_tx = Vector256.ConvertToInt32(v_incU * v_invWeight) & v_maskX;
+                        Vector256<int> v_ty = Vector256.ConvertToInt32(v_incV * v_invWeight) & v_maskY;
+                        Vector256<int> v_textureIndices = (v_ty * v_texWidth) + v_tx;
+
+                        Vector256<uint> v_rawColors = Vector256.Create(
+                            Unsafe.Add(ref sampleTexRef, v_textureIndices.GetElement(0)),
+                            Unsafe.Add(ref sampleTexRef, v_textureIndices.GetElement(1)),
+                            Unsafe.Add(ref sampleTexRef, v_textureIndices.GetElement(2)),
+                            Unsafe.Add(ref sampleTexRef, v_textureIndices.GetElement(3)),
+                            Unsafe.Add(ref sampleTexRef, v_textureIndices.GetElement(4)),
+                            Unsafe.Add(ref sampleTexRef, v_textureIndices.GetElement(5)),
+                            Unsafe.Add(ref sampleTexRef, v_textureIndices.GetElement(6)),
+                            Unsafe.Add(ref sampleTexRef, v_textureIndices.GetElement(7))
+                        );
+
+                        Vector256<uint> r = ((v_rawColors >> 0) & v_channelMask) * v_diffuse >> 8;
+                        Vector256<uint> g = ((v_rawColors >> 8) & v_channelMask) * v_diffuse >> 8;
+                        Vector256<uint> b = ((v_rawColors >> 16) & v_channelMask) * v_diffuse >> 8;
+                        Vector256<uint> a = (v_rawColors >> 24) & v_channelMask;
+                        Vector256<uint> v_calculatedColors = r | (g << 8) | (b << 16) | (a << 24);
+
+                        Vector256<float> v_finalDepth = Vector256.ConditionalSelect(v_executionMask.AsSingle(), v_calculatedZ, v_currentDepth);
+                        Vector256<uint> v_currentColors = Vector256.LoadUnsafe(ref backBufferRef, (uint)memoryOffset);
+                        Vector256<uint> v_finalColors = Vector256.ConditionalSelect(v_executionMask.AsUInt32(), v_calculatedColors, v_currentColors);
+
+                        Vector256.StoreUnsafe(v_finalDepth, ref depthBufferRef, (uint)memoryOffset);
+                        Vector256.StoreUnsafe(v_finalColors, ref backBufferRef, (uint)memoryOffset);
+                    NextRow:
+                        v_edgeRow0 += v_edgeB0;
+                        v_edgeRow1 += v_edgeB1;
+                        v_edgeRow2 += v_edgeB2;
+                        v_baseW += v_invwy;
+                        v_baseZ += v_invzy;
+                        v_baseU += v_invuy;
+                        v_baseV += v_invvy;
+                    }
+                }
             }
-
-            int tileMinX = tile.minx;
-            int tileMaxX = tile.maxx;
-            int tileMinY = tile.miny;
-            int tileMaxY = tile.maxy;
-
-            int startOffset = t * 128;
-
-            for (int bt = 0; bt < tile.intsCount; bt++)
+        }
+        else
+        {
+            int totalTiles = tiles.Length;
+            for (int t = 0; t < totalTiles; t++)
             {
-                int triId = ArrayOfInts[startOffset + bt];
-                Triangle tri = triangles[triId];
-
-                int startY = Math.Max(tileMinY, tri.ymin);
-                int endY = Math.Min(tileMaxY - 1, tri.ymax);
-                int startX = Math.Max(tileMinX, tri.xmin);
-                int endX = Math.Min(tileMaxX - 1, tri.xmax);
-
-                if (startX > endX || startY > endY)
+                Tile tile = tiles[t];
+                if (tile.intsCount == 0)
                 {
                     continue;
                 }
 
-                float startPx = startX + 0.5f;
-                float startPy = startY + 0.5f;
+                int tileMinX = tile.minx;
+                int tileMaxX = tile.maxx;
+                int tileMinY = tile.miny;
+                int tileMaxY = tile.maxy;
 
-                float edgeRow0 = tri.edgeA0 * startPx + tri.edgeB0 * startPy + tri.edgeC0;
-                float edgeRow1 = tri.edgeA1 * startPx + tri.edgeB1 * startPy + tri.edgeC1;
-                float edgeRow2 = tri.edgeA2 * startPx + tri.edgeB2 * startPy + tri.edgeC2;
+                int startOffset = t * 128;
 
-                float startW0 = edgeRow0 * tri.invArea;
-                float startW1 = edgeRow1 * tri.invArea;
-                float startW2 = edgeRow2 * tri.invArea;
-
-                float rowW = startW0 * tri.invw0 + startW1 * tri.invw1 + startW2 * tri.invw2;
-                float rowZ = startW0 * tri.invz0 + startW1 * tri.invz1 + startW2 * tri.invz2;
-                float rowU = startW0 * tri.invuv0.X + startW1 * tri.invuv1.X + startW2 * tri.invuv2.X;
-                float rowV = startW0 * tri.invuv0.Y + startW1 * tri.invuv1.Y + startW2 * tri.invuv2.Y;
-
-                float diffuse = tri.diffuse;
-
-                for (int y = startY; y <= endY; y++)
+                for (int bt = 0; bt < tile.intsCount; bt++)
                 {
-                    int p = y * Width + startX;
+                    int triId = ArrayOfInts[startOffset + bt];
+                    Triangle tri = triangles[triId];
 
-                    float edge0 = edgeRow0;
-                    float edge1 = edgeRow1;
-                    float edge2 = edgeRow2;
+                    int startY = Math.Max(tileMinY, tri.ymin);
+                    int endY = Math.Min(tileMaxY - 1, tri.ymax);
+                    int startX = Math.Max(tileMinX, tri.xmin);
+                    int endX = Math.Min(tileMaxX - 1, tri.xmax);
 
-                    float incW = rowW;
-                    float incZ = rowZ;
-                    float incU = rowU;
-                    float incV = rowV;
-
-                    for (int x = startX; x <= endX; x++)
+                    if (startX > endX || startY > endY)
                     {
-                        if (edge0 <= 0f && edge1 <= 0f && edge2 <= 0f)
-                        {
-                            float invWeight = 1.0f / incW;
-                            float z = incZ * invWeight;
-
-                            if (z < depthBuffer[p])
-                            {
-                                depthBuffer[p] = z;
-
-                                float texX = incU * invWeight;
-                                float texY = incV * invWeight;
-
-                                int tx = ((int)texX - (texX < 0 ? 1 : 0)) & maskX;
-                                int ty = ((int)texY - (texY < 0 ? 1 : 0)) & maskY;
-
-                                uint col = sampleTexture[ty * texWidth + tx];
-
-                                byte r = (byte)(((col >> 0) & 255) * diffuse);
-                                byte g = (byte)(((col >> 8) & 255) * diffuse);
-                                byte b = (byte)(((col >> 16) & 255) * diffuse);
-                                byte a = (byte)((col >> 24) & 255);
-
-                                backBuffer[p] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
-                            }
-                        }
-
-                        edge0 += tri.edgeA0;
-                        edge1 += tri.edgeA1;
-                        edge2 += tri.edgeA2;
-
-                        incW += tri.invwx;
-                        incZ += tri.invzx;
-                        incU += tri.invux;
-                        incV += tri.invvx;
-                        p += 1;
+                        continue;
                     }
 
-                    edgeRow0 += tri.edgeB0;
-                    edgeRow1 += tri.edgeB1;
-                    edgeRow2 += tri.edgeB2;
+                    float startPx = startX + 0.5f;
+                    float startPy = startY + 0.5f;
 
-                    rowW += tri.invwy;
-                    rowZ += tri.invzy;
-                    rowU += tri.invuy;
-                    rowV += tri.invvy;
+                    float edgeRow0 = tri.edgeA0 * startPx + tri.edgeB0 * startPy + tri.edgeC0;
+                    float edgeRow1 = tri.edgeA1 * startPx + tri.edgeB1 * startPy + tri.edgeC1;
+                    float edgeRow2 = tri.edgeA2 * startPx + tri.edgeB2 * startPy + tri.edgeC2;
+
+                    float startW0 = edgeRow0 * tri.invArea;
+                    float startW1 = edgeRow1 * tri.invArea;
+                    float startW2 = edgeRow2 * tri.invArea;
+
+                    float rowW = startW0 * tri.invw0 + startW1 * tri.invw1 + startW2 * tri.invw2;
+                    float rowZ = startW0 * tri.invz0 + startW1 * tri.invz1 + startW2 * tri.invz2;
+                    float rowU = startW0 * tri.invuv0.X + startW1 * tri.invuv1.X + startW2 * tri.invuv2.X;
+                    float rowV = startW0 * tri.invuv0.Y + startW1 * tri.invuv1.Y + startW2 * tri.invuv2.Y;
+
+                    float diffuse = tri.diffuse;
+
+                    for (int y = startY; y <= endY; y++)
+                    {
+                        int p = y * Width + startX;
+
+                        float edge0 = edgeRow0;
+                        float edge1 = edgeRow1;
+                        float edge2 = edgeRow2;
+
+                        float incW = rowW;
+                        float incZ = rowZ;
+                        float incU = rowU;
+                        float incV = rowV;
+
+                        for (int x = startX; x <= endX; x++)
+                        {
+                            if (edge0 <= 0f && edge1 <= 0f && edge2 <= 0f)
+                            {
+                                float invWeight = 1.0f / incW;
+                                float z = incZ * invWeight;
+
+                                if (z < depthBuffer[p])
+                                {
+                                    depthBuffer[p] = z;
+
+                                    float texX = incU * invWeight;
+                                    float texY = incV * invWeight;
+
+                                    int tx = ((int)texX - (texX < 0 ? 1 : 0)) & maskX;
+                                    int ty = ((int)texY - (texY < 0 ? 1 : 0)) & maskY;
+
+                                    uint col = sampleTexture[ty * texWidth + tx];
+
+                                    byte r = (byte)(((col >> 0) & 255) * diffuse);
+                                    byte g = (byte)(((col >> 8) & 255) * diffuse);
+                                    byte b = (byte)(((col >> 16) & 255) * diffuse);
+                                    byte a = (byte)((col >> 24) & 255);
+
+                                    backBuffer[p] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
+                                }
+                            }
+
+                            edge0 += tri.edgeA0;
+                            edge1 += tri.edgeA1;
+                            edge2 += tri.edgeA2;
+
+                            incW += tri.invwx;
+                            incZ += tri.invzx;
+                            incU += tri.invux;
+                            incV += tri.invvx;
+                            p += 1;
+                        }
+
+                        edgeRow0 += tri.edgeB0;
+                        edgeRow1 += tri.edgeB1;
+                        edgeRow2 += tri.edgeB2;
+
+                        rowW += tri.invwy;
+                        rowZ += tri.invzy;
+                        rowU += tri.invuy;
+                        rowV += tri.invvy;
+                    }
                 }
             }
         }
