@@ -1,8 +1,4 @@
 ﻿using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
 
 public struct Triangle
 {
@@ -19,11 +15,6 @@ public struct Triangle
     public float invvx, invvy;
     public float diffuse;
     public float invArea;
-    public int xmin;
-    public int ymin;
-    public int xmax;
-    public int ymax;
-    public int triangleId;
 };
 
 [Serializable]
@@ -112,12 +103,22 @@ public struct ColliderMeta
 public struct Tile
 {
     public int frameFlag;
+    public int triangleCount;
     public int minx;
     public int miny;
     public int maxx;
     public int maxy;
-    public int intsCount;
 };
+
+
+public struct TileTriangle
+{
+    public int triangleIndex;
+    public int minx;
+    public int miny;
+    public int maxx;
+    public int maxy;
+}
 
 public static class LevelFunctions
 {
@@ -131,12 +132,10 @@ public static class LevelFunctions
 
                 tiles[index] = new Tile
                 {
-                    frameFlag = 0,
                     minx = x * tileSizeX,
                     miny = y * tileSizeY,
                     maxx = (x + 1) * tileSizeX,
-                    maxy = (y + 1) * tileSizeY,
-                    intsCount = 0
+                    maxy = (y + 1) * tileSizeY
                 };
             }
         }
@@ -180,19 +179,7 @@ public static class LevelFunctions
         return visibleSectors;
     }
 
-    public static Vector4[][] ArrayOfArraysMake(List<SectorMeta> sectors)
-    {
-        Vector4[][] ArrayOfRectangleArrays = new Vector4[sectors.Count][];
-
-        for (int i = 0; i < sectors.Count; i++)
-        {
-            ArrayOfRectangleArrays[i] = new Vector4[32];
-        }
-
-        return ArrayOfRectangleArrays;
-    }
-
-    public static void GetPortals(SectorMeta ASector, List<List<SectorMeta>> ListOfSectorLists, Vector4[][] ArrayOfRectangleArrays, int[] visibleSectors, List<PortalMeta> portals, float planeDistance, List<MathematicalPlane> planes, List<SectorMeta> sectors, List<SectorMeta> contact, List<Vector3> OutEdgeVertices, Vector3 CamPosition, Matrix4x4 CamViewProj, List<Vector3> edges, List<int> lines, Vector4[] processEdges, Vector4[] temporaryEdges, bool[] boolEdges)
+    public static void GetPortals(SectorMeta ASector, List<List<SectorMeta>> ListOfSectorLists, Vector4[] ArrayOfRectangles, int[] visibleSectors, List<PortalMeta> portals, float planeDistance, List<MathematicalPlane> planes, List<SectorMeta> sectors, List<SectorMeta> contact, List<Vector3> OutEdgeVertices, Vector3 CamPosition, Matrix4x4 CamViewProj, List<Vector3> edges, List<int> lines, Vector4[] processEdges, Vector4[] temporaryEdges, bool[] boolEdges)
     {
         int input = 0;
         int output = 1;
@@ -200,7 +187,7 @@ public static class LevelFunctions
         ListOfSectorLists[input].Clear();
         ListOfSectorLists[output].Clear();
 
-        ArrayOfRectangleArrays[ASector.sectorId][ASector.rectangle] = new Vector4(-1.0f, -1.0f, 1.0f, 1.0f);
+        ArrayOfRectangles[(ASector.sectorId * 32) + ASector.rectangle] = new Vector4(-1.0f, -1.0f, 1.0f, 1.0f);
 
         visibleSectors[ASector.sectorId] += 1;
 
@@ -230,7 +217,7 @@ public static class LevelFunctions
             {
                 SectorMeta sector = ListOfSectorLists[input][b];
 
-                Vector4 rectangleIn = ArrayOfRectangleArrays[sector.sectorId][sector.rectangle];
+                Vector4 rectangleIn = ArrayOfRectangles[(sector.sectorId * 32) + sector.rectangle];
 
                 for (int c = sector.portalStartIndex; c < sector.portalStartIndex + sector.portalCount; c++)
                 {
@@ -260,7 +247,7 @@ public static class LevelFunctions
 
                     if (SectorsContains(sectorpolygon.sectorId, contact))
                     {
-                        ArrayOfRectangleArrays[connectedsector][nextcount] = rectangleIn;
+                        ArrayOfRectangles[(connectedsector * 32) + nextcount] = rectangleIn;
 
                         visibleSectors[connectedsector] = nextcount + 1;
 
@@ -293,7 +280,7 @@ public static class LevelFunctions
 
                     for (int i = 0; i < nextcount; i++)
                     {
-                        if (RectanglesIdentical(ArrayOfRectangleArrays[connectedsector][i], rectangleOut))
+                        if (RectanglesIdentical(ArrayOfRectangles[(connectedsector * 32) + i], rectangleOut))
                         {
                             identical = true;
                             break;
@@ -305,7 +292,7 @@ public static class LevelFunctions
                         continue;
                     }
 
-                    ArrayOfRectangleArrays[connectedsector][nextcount] = rectangleOut;
+                    ArrayOfRectangles[(connectedsector * 32) + nextcount] = rectangleOut;
 
                     visibleSectors[connectedsector] = nextcount + 1;
 
@@ -323,10 +310,12 @@ public static class LevelFunctions
         }
     }
 
-    public static void SetTriangles(int[] visibleSectors, List<MeshMeta> meshes, Vector4[][] ArrayOfRectangleArrays, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, int[] ArrayOfInts, Tile[] tiles, int tilesX, int tilesY, int frameAlternate, int texWidth, int texHeight, int tileSizeX, int tileSizeY, Vector3 lightDir)
+    public static void SetTriangles(int[] visibleSectors, List<MeshMeta> meshes, Vector4[] ArrayOfRectangles, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, Triangle[] ArrayOfTriangles, Matrix4x4 CamViewProj, int Width, int Height, TileTriangle[] ArrayOfTileTriangles, Tile[] tiles, int tilesX, int tilesY, int frameAlternate, int texWidth, int texHeight, int tileSizeX, int tileSizeY, Vector3 lightDir)
     {
         for (int a = 0; a < visibleSectors.Length; a++)
         {
+            int triangles = 0;
+
             int count = visibleSectors[a];
 
             if (count == 0)
@@ -336,9 +325,593 @@ public static class LevelFunctions
 
             MeshMeta mesh = meshes[a];
 
-            Vector4[] rectanglesArray = ArrayOfRectangleArrays[a];
+            for (int b = mesh.indicesStartIndex; b < mesh.indicesStartIndex + mesh.indicesCount; b += 3)
+            {
+                Vector3 world0 = vertices[indices[b]];
+                Vector3 world1 = vertices[indices[b + 1]];
+                Vector3 world2 = vertices[indices[b + 2]];
 
-            ClipTrianglesWithRectangles(count, rectanglesArray, mesh, vertices, textures, normals, indices, CamPosition, processbool, processvertices, temporaryvertices, processtextures, temporarytextures, processnormals, temporarynormals, triangles, CamViewProj, Width, Height, ArrayOfInts, tiles, tilesX, tilesY, frameAlternate, texWidth, texHeight, tileSizeX, tileSizeY, lightDir);
+                Vector3 edge1 = world1 - world0;
+                Vector3 edge2 = world2 - world0;
+                Vector3 normal = Vector3.Normalize(Vector3.Cross(edge1, edge2));
+                Vector3 camDir = Vector3.Normalize(CamPosition - world0);
+                float triangleDir = Vector3.Dot(normal, camDir);
+
+                if (triangleDir < 0)
+                {
+                    continue;
+                }
+
+                Vector4 clip0 = ConvertWorldToClip(CamViewProj, world0);
+                Vector4 clip1 = ConvertWorldToClip(CamViewProj, world1);
+                Vector4 clip2 = ConvertWorldToClip(CamViewProj, world2);
+
+                int processverticescount = 0;
+                int processtexturescount = 0;
+                int processnormalscount = 0;
+                int processboolcount = 0;
+
+                processvertices[processverticescount] = clip0;
+                processvertices[processverticescount + 1] = clip1;
+                processvertices[processverticescount + 2] = clip2;
+                processverticescount += 3;
+                processtextures[processtexturescount] = textures[indices[b]];
+                processtextures[processtexturescount + 1] = textures[indices[b + 1]];
+                processtextures[processtexturescount + 2] = textures[indices[b + 2]];
+                processtexturescount += 3;
+                processnormals[processnormalscount] = normals[indices[b]];
+                processnormals[processnormalscount + 1] = normals[indices[b + 1]];
+                processnormals[processnormalscount + 2] = normals[indices[b + 2]];
+                processnormalscount += 3;
+                processbool[processboolcount] = true;
+                processbool[processboolcount + 1] = true;
+                processbool[processboolcount + 2] = true;
+                processboolcount += 3;
+
+                for (int c = 0; c < 2; c++)
+                {
+                    int AddTriangles = 0;
+
+                    int temporaryverticescount = 0;
+                    int temporarytexturescount = 0;
+                    int temporarynormalscount = 0;
+
+                    for (int d = 0; d < processverticescount; d += 3)
+                    {
+                        if (processbool[d] == false && processbool[d + 1] == false && processbool[d + 2] == false)
+                        {
+                            continue;
+                        }
+
+                        Vector4 v0 = processvertices[d];
+                        Vector4 v1 = processvertices[d + 1];
+                        Vector4 v2 = processvertices[d + 2];
+
+                        Vector2 uv0 = processtextures[d];
+                        Vector2 uv1 = processtextures[d + 1];
+                        Vector2 uv2 = processtextures[d + 2];
+
+                        Vector3 n0 = processnormals[d];
+                        Vector3 n1 = processnormals[d + 1];
+                        Vector3 n2 = processnormals[d + 2];
+
+                        float d0, d1, d2;
+
+                        switch (c)
+                        {
+                            case 0: // Near
+                                d0 = v0.Z;
+                                d1 = v1.Z;
+                                d2 = v2.Z;
+                                break;
+
+                            case 1: // Far
+                                d0 = v0.W - v0.Z;
+                                d1 = v1.W - v1.Z;
+                                d2 = v2.W - v2.Z;
+                                break;
+
+                            default:
+                                d0 = 0;
+                                d1 = 0;
+                                d2 = 0;
+                                break;
+                        }
+
+                        bool b0 = d0 >= 0;
+                        bool b1 = d1 >= 0;
+                        bool b2 = d2 >= 0;
+
+                        if (b0 && b1 && b2)
+                        {
+                            continue;
+                        }
+                        else if ((b0 && !b1 && !b2) || (!b0 && b1 && !b2) || (!b0 && !b1 && b2))
+                        {
+                            Vector4 inV, outV1, outV2;
+                            Vector2 inUV, outUV1, outUV2;
+                            Vector3 inN, outN1, outN2;
+                            float inD, outD1, outD2;
+
+                            if (b0)
+                            {
+                                inV = v0;
+                                inUV = uv0;
+                                inN = n0;
+                                inD = d0;
+                                outV1 = v1;
+                                outUV1 = uv1;
+                                outN1 = n1;
+                                outD1 = d1;
+                                outV2 = v2;
+                                outUV2 = uv2;
+                                outN2 = n2;
+                                outD2 = d2;
+                            }
+                            else if (b1)
+                            {
+                                inV = v1;
+                                inUV = uv1;
+                                inN = n1;
+                                inD = d1;
+                                outV1 = v2;
+                                outUV1 = uv2;
+                                outN1 = n2;
+                                outD1 = d2;
+                                outV2 = v0;
+                                outUV2 = uv0;
+                                outN2 = n0;
+                                outD2 = d0;
+                            }
+                            else
+                            {
+                                inV = v2;
+                                inUV = uv2;
+                                inN = n2;
+                                inD = d2;
+                                outV1 = v0;
+                                outUV1 = uv0;
+                                outN1 = n0;
+                                outD1 = d0;
+                                outV2 = v1;
+                                outUV2 = uv1;
+                                outN2 = n1;
+                                outD2 = d1;
+                            }
+
+                            float t1 = inD / (inD - outD1);
+                            float t2 = inD / (inD - outD2);
+
+                            temporaryvertices[temporaryverticescount] = inV;
+                            temporaryvertices[temporaryverticescount + 1] = Vector4.Lerp(inV, outV1, t1);
+                            temporaryvertices[temporaryverticescount + 2] = Vector4.Lerp(inV, outV2, t2);
+                            temporaryverticescount += 3;
+                            temporarytextures[temporarytexturescount] = inUV;
+                            temporarytextures[temporarytexturescount + 1] = Vector2.Lerp(inUV, outUV1, t1);
+                            temporarytextures[temporarytexturescount + 2] = Vector2.Lerp(inUV, outUV2, t2);
+                            temporarytexturescount += 3;
+                            temporarynormals[temporarynormalscount] = inN;
+                            temporarynormals[temporarynormalscount + 1] = Vector3.Normalize(Vector3.Lerp(inN, outN1, t1));
+                            temporarynormals[temporarynormalscount + 2] = Vector3.Normalize(Vector3.Lerp(inN, outN2, t2));
+                            temporarynormalscount += 3;
+                            processbool[d] = false;
+                            processbool[d + 1] = false;
+                            processbool[d + 2] = false;
+
+                            AddTriangles += 1;
+                        }
+                        else if ((!b0 && b1 && b2) || (b0 && !b1 && b2) || (b0 && b1 && !b2))
+                        {
+                            Vector4 inV1, inV2, outV;
+                            Vector2 inUV1, inUV2, outUV;
+                            Vector3 inN1, inN2, outN;
+                            float inD1, inD2, outD;
+
+                            if (!b0)
+                            {
+                                outV = v0;
+                                outUV = uv0;
+                                outN = n0;
+                                outD = d0;
+                                inV1 = v1;
+                                inUV1 = uv1;
+                                inN1 = n1;
+                                inD1 = d1;
+                                inV2 = v2;
+                                inUV2 = uv2;
+                                inN2 = n2;
+                                inD2 = d2;
+                            }
+                            else if (!b1)
+                            {
+                                outV = v1;
+                                outUV = uv1;
+                                outN = n1;
+                                outD = d1;
+                                inV1 = v2;
+                                inUV1 = uv2;
+                                inN1 = n2;
+                                inD1 = d2;
+                                inV2 = v0;
+                                inUV2 = uv0;
+                                inN2 = n0;
+                                inD2 = d0;
+                            }
+                            else
+                            {
+                                outV = v2;
+                                outUV = uv2;
+                                outN = n2;
+                                outD = d2;
+                                inV1 = v0;
+                                inUV1 = uv0;
+                                inN1 = n0;
+                                inD1 = d0;
+                                inV2 = v1;
+                                inUV2 = uv1;
+                                inN2 = n1;
+                                inD2 = d1;
+                            }
+
+                            float t1 = inD1 / (inD1 - outD);
+                            float t2 = inD2 / (inD2 - outD);
+
+                            Vector4 vA = Vector4.Lerp(inV1, outV, t1);
+                            Vector4 vB = Vector4.Lerp(inV2, outV, t2);
+
+                            Vector2 uvA = Vector2.Lerp(inUV1, outUV, t1);
+                            Vector2 uvB = Vector2.Lerp(inUV2, outUV, t2);
+
+                            Vector3 nA = Vector3.Normalize(Vector3.Lerp(inN1, outN, t1));
+                            Vector3 nB = Vector3.Normalize(Vector3.Lerp(inN2, outN, t2));
+
+                            temporaryvertices[temporaryverticescount] = inV1;
+                            temporaryvertices[temporaryverticescount + 1] = inV2;
+                            temporaryvertices[temporaryverticescount + 2] = vA;
+                            temporaryverticescount += 3;
+                            temporarytextures[temporarytexturescount] = inUV1;
+                            temporarytextures[temporarytexturescount + 1] = inUV2;
+                            temporarytextures[temporarytexturescount + 2] = uvA;
+                            temporarytexturescount += 3;
+                            temporarynormals[temporarynormalscount] = inN1;
+                            temporarynormals[temporarynormalscount + 1] = inN2;
+                            temporarynormals[temporarynormalscount + 2] = nA;
+                            temporarynormalscount += 3;
+                            temporaryvertices[temporaryverticescount] = vA;
+                            temporaryvertices[temporaryverticescount + 1] = inV2;
+                            temporaryvertices[temporaryverticescount + 2] = vB;
+                            temporaryverticescount += 3;
+                            temporarytextures[temporarytexturescount] = uvA;
+                            temporarytextures[temporarytexturescount + 1] = inUV2;
+                            temporarytextures[temporarytexturescount + 2] = uvB;
+                            temporarytexturescount += 3;
+                            temporarynormals[temporarynormalscount] = nA;
+                            temporarynormals[temporarynormalscount + 1] = inN2;
+                            temporarynormals[temporarynormalscount + 2] = nB;
+                            temporarynormalscount += 3;
+                            processbool[d] = false;
+                            processbool[d + 1] = false;
+                            processbool[d + 2] = false;
+
+                            AddTriangles += 2;
+                        }
+                        else
+                        {
+                            processbool[d] = false;
+                            processbool[d + 1] = false;
+                            processbool[d + 2] = false;
+                        }
+                    }
+
+                    if (AddTriangles > 0)
+                    {
+                        for (int e = 0; e < temporaryverticescount; e += 3)
+                        {
+                            processvertices[processverticescount] = temporaryvertices[e];
+                            processvertices[processverticescount + 1] = temporaryvertices[e + 1];
+                            processvertices[processverticescount + 2] = temporaryvertices[e + 2];
+                            processverticescount += 3;
+                            processtextures[processtexturescount] = temporarytextures[e];
+                            processtextures[processtexturescount + 1] = temporarytextures[e + 1];
+                            processtextures[processtexturescount + 2] = temporarytextures[e + 2];
+                            processtexturescount += 3;
+                            processnormals[processnormalscount] = temporarynormals[e];
+                            processnormals[processnormalscount + 1] = temporarynormals[e + 1];
+                            processnormals[processnormalscount + 2] = temporarynormals[e + 2];
+                            processnormalscount += 3;
+                            processbool[processboolcount] = true;
+                            processbool[processboolcount + 1] = true;
+                            processbool[processboolcount + 2] = true;
+                            processboolcount += 3;
+                        }
+                    }
+                }
+
+                for (int f = 0; f < processboolcount; f += 3)
+                {
+                    if (processbool[f] == true && processbool[f + 1] == true && processbool[f + 2] == true)
+                    {
+                        if (triangles >= 128)
+                        {
+                            continue;
+                        }
+
+                        Triangle tri = new Triangle();
+
+                        float invw0 = 1.0f / processvertices[f].W;
+                        float invw1 = 1.0f / processvertices[f + 1].W;
+                        float invw2 = 1.0f / processvertices[f + 2].W;
+
+                        Vector2 screen0 = new((processvertices[f].X * invw0 * 0.5f + 0.5f) * Width, (1.0f - (processvertices[f].Y * invw0 * 0.5f + 0.5f)) * Height);
+                        Vector2 screen1 = new((processvertices[f + 1].X * invw1 * 0.5f + 0.5f) * Width, (1.0f - (processvertices[f + 1].Y * invw1 * 0.5f + 0.5f)) * Height);
+                        Vector2 screen2 = new((processvertices[f + 2].X * invw2 * 0.5f + 0.5f) * Width, (1.0f - (processvertices[f + 2].Y * invw2 * 0.5f + 0.5f)) * Height);
+
+                        float area = (screen0.Y - screen1.Y) * screen2.X +
+                                     (screen1.X - screen0.X) * screen2.Y +
+                                     (screen0.X * screen1.Y - screen0.Y * screen1.X);
+
+                        if (MathF.Abs(area) < 1e-5f || area > 0f)
+                        {
+                            continue;
+                        }
+
+                        tri.invz0 = processvertices[f].Z * invw0;
+                        tri.invz1 = processvertices[f + 1].Z * invw1;
+                        tri.invz2 = processvertices[f + 2].Z * invw2;
+
+                        tri.invuv0 = new(processtextures[f].X * invw0, processtextures[f].Y * invw0);
+                        tri.invuv1 = new(processtextures[f + 1].X * invw1, processtextures[f + 1].Y * invw1);
+                        tri.invuv2 = new(processtextures[f + 2].X * invw2, processtextures[f + 2].Y * invw2);
+
+                        tri.invw0 = invw0;
+                        tri.invw1 = invw1;
+                        tri.invw2 = invw2;
+
+                        tri.screen0 = screen0;
+                        tri.screen1 = screen1;
+                        tri.screen2 = screen2;
+
+                        tri.invArea = 1.0f / area;
+
+                        tri.edgeA0 = tri.screen1.Y - tri.screen2.Y;
+                        tri.edgeB0 = tri.screen2.X - tri.screen1.X;
+                        tri.edgeC0 = tri.screen1.X * tri.screen2.Y - tri.screen1.Y * tri.screen2.X;
+
+                        tri.edgeA1 = tri.screen2.Y - tri.screen0.Y;
+                        tri.edgeB1 = tri.screen0.X - tri.screen2.X;
+                        tri.edgeC1 = tri.screen2.X * tri.screen0.Y - tri.screen2.Y * tri.screen0.X;
+
+                        tri.edgeA2 = tri.screen0.Y - tri.screen1.Y;
+                        tri.edgeB2 = tri.screen1.X - tri.screen0.X;
+                        tri.edgeC2 = tri.screen0.X * tri.screen1.Y - tri.screen0.Y * tri.screen1.X;
+
+                        float a0 = tri.edgeA0 * tri.invArea;
+                        float a1 = tri.edgeA1 * tri.invArea;
+                        float a2 = tri.edgeA2 * tri.invArea;
+
+                        float b0 = tri.edgeB0 * tri.invArea;
+                        float b1 = tri.edgeB1 * tri.invArea;
+                        float b2 = tri.edgeB2 * tri.invArea;
+
+                        tri.invuv0.X = tri.invuv0.X * texWidth;
+                        tri.invuv0.Y = tri.invuv0.Y * texHeight;
+
+                        tri.invuv1.X = tri.invuv1.X * texWidth;
+                        tri.invuv1.Y = tri.invuv1.Y * texHeight;
+
+                        tri.invuv2.X = tri.invuv2.X * texWidth;
+                        tri.invuv2.Y = tri.invuv2.Y * texHeight;
+
+                        tri.invwx = a0 * tri.invw0 + a1 * tri.invw1 + a2 * tri.invw2;
+                        tri.invwy = b0 * tri.invw0 + b1 * tri.invw1 + b2 * tri.invw2;
+
+                        tri.invzx = a0 * tri.invz0 + a1 * tri.invz1 + a2 * tri.invz2;
+                        tri.invzy = b0 * tri.invz0 + b1 * tri.invz1 + b2 * tri.invz2;
+
+                        tri.invux = a0 * tri.invuv0.X + a1 * tri.invuv1.X + a2 * tri.invuv2.X;
+                        tri.invuy = b0 * tri.invuv0.X + b1 * tri.invuv1.X + b2 * tri.invuv2.X;
+
+                        tri.invvx = a0 * tri.invuv0.Y + a1 * tri.invuv1.Y + a2 * tri.invuv2.Y;
+                        tri.invvy = b0 * tri.invuv0.Y + b1 * tri.invuv1.Y + b2 * tri.invuv2.Y;
+
+                        float rawDiffuse = Vector3.Dot(processnormals[f], lightDir) * 0.5f + 0.5f;
+
+                        rawDiffuse = MathF.Min(1.0f, (rawDiffuse * rawDiffuse) + 0.2f);
+
+                        tri.diffuse = Math.Clamp(rawDiffuse, 0.0f, 1.0f);
+
+                        ArrayOfTriangles[(a * 128) + triangles] = tri;
+                        triangles += 1;
+                    }
+                }
+            }
+
+            for (int g = 0; g < count; g++)
+            {
+                Vector4 rectangle = ArrayOfRectangles[(a * 32) + g];
+
+                int portalXmin = (int)MathF.Floor((rectangle.X * 0.5f + 0.5f) * Width);
+                int portalYmin = (int)MathF.Floor((1.0f - (rectangle.W * 0.5f + 0.5f)) * Height);
+                int portalXmax = (int)MathF.Ceiling((rectangle.Z * 0.5f + 0.5f) * Width);
+                int portalYmax = (int)MathF.Ceiling((1.0f - (rectangle.Y * 0.5f + 0.5f)) * Height);
+
+                portalXmin = Math.Clamp(portalXmin, 0, Width - 1);
+                portalYmin = Math.Clamp(portalYmin, 0, Height - 1);
+                portalXmax = Math.Clamp(portalXmax, 0, Width - 1);
+                portalYmax = Math.Clamp(portalYmax, 0, Height - 1);
+
+                if (portalXmin >= portalXmax || portalYmin >= portalYmax)
+                {
+                    continue;
+                }
+
+                for (int h = 0; h < triangles; h++)
+                {
+                    Triangle tri = ArrayOfTriangles[(a * 128) + h];
+
+                    int triXmin = (int)MathF.Floor(MathF.Min(tri.screen0.X, MathF.Min(tri.screen1.X, tri.screen2.X)));
+                    int triYmin = (int)MathF.Floor(MathF.Min(tri.screen0.Y, MathF.Min(tri.screen1.Y, tri.screen2.Y)));
+                    int triXmax = (int)MathF.Ceiling(MathF.Max(tri.screen0.X, MathF.Max(tri.screen1.X, tri.screen2.X)));
+                    int triYmax = (int)MathF.Ceiling(MathF.Max(tri.screen0.Y, MathF.Max(tri.screen1.Y, tri.screen2.Y)));
+
+                    int combinedXmin = Math.Max(triXmin, portalXmin);
+                    int combinedYmin = Math.Max(triYmin, portalYmin);
+                    int combinedXmax = Math.Min(triXmax, portalXmax);
+                    int combinedYmax = Math.Min(triYmax, portalYmax);
+
+                    if (combinedXmin >= combinedXmax || combinedYmin >= combinedYmax)
+                    {
+                        continue;
+                    }
+
+                    int startTileX = Math.Clamp(combinedXmin / tileSizeX, 0, tilesX - 1);
+                    int endTileX = Math.Clamp(combinedXmax / tileSizeX, 0, tilesX - 1);
+                    int startTileY = Math.Clamp(combinedYmin / tileSizeY, 0, tilesY - 1);
+                    int endTileY = Math.Clamp(combinedYmax / tileSizeY, 0, tilesY - 1);
+
+                    float n0X = tri.edgeA0; float n0Y = tri.edgeB0;
+                    float n1X = tri.edgeA1; float n1Y = tri.edgeB1;
+                    float n2X = tri.edgeA2; float n2Y = tri.edgeB2;
+
+                    float triMin0 = MathF.Min(n0X * tri.screen0.X + n0Y * tri.screen0.Y, n0X * tri.screen2.X + n0Y * tri.screen2.Y);
+                    float triMax0 = MathF.Max(n0X * tri.screen0.X + n0Y * tri.screen0.Y, n0X * tri.screen2.X + n0Y * tri.screen2.Y);
+
+                    float triMin1 = MathF.Min(n1X * tri.screen1.X + n1Y * tri.screen1.Y, n1X * tri.screen0.X + n1Y * tri.screen0.Y);
+                    float triMax1 = MathF.Max(n1X * tri.screen1.X + n1Y * tri.screen1.Y, n1X * tri.screen0.X + n1Y * tri.screen0.Y);
+
+                    float triMin2 = MathF.Min(n2X * tri.screen2.X + n2Y * tri.screen2.Y, n2X * tri.screen1.X + n2Y * tri.screen1.Y);
+                    float triMax2 = MathF.Max(n2X * tri.screen2.X + n2Y * tri.screen2.Y, n2X * tri.screen1.X + n2Y * tri.screen1.Y);
+
+                    for (int y = startTileY; y <= endTileY; y++)
+                    {
+                        for (int x = startTileX; x <= endTileX; x++)
+                        {
+                            int tileIndex = y * tilesX + x;
+                            Tile tile = tiles[tileIndex];
+
+                            if (tiles[tileIndex].frameFlag != frameAlternate)
+                            {
+                                tiles[tileIndex].triangleCount = 0;
+                                tiles[tileIndex].frameFlag = frameAlternate;
+                            }
+
+                            int triangleCount = tiles[tileIndex].triangleCount;
+
+                            if (triangleCount >= 128)
+                            {
+                                continue;
+                            }
+
+                            int tileMinX = Math.Max(tile.minx, combinedXmin);
+                            int tileMinY = Math.Max(tile.miny, combinedYmin);
+                            int tileMaxX = Math.Min(tile.maxx, combinedXmax);
+                            int tileMaxY = Math.Min(tile.maxy, combinedYmax);
+
+                            if (tileMinX >= tileMaxX || tileMinY >= tileMaxY)
+                            {
+                                continue;
+                            }
+
+                            float e0c0 = n0X * tileMinX + n0Y * tileMinY + tri.edgeC0;
+                            float e0c1 = n0X * tileMaxX + n0Y * tileMinY + tri.edgeC0;
+                            float e0c2 = n0X * tileMinX + n0Y * tileMaxY + tri.edgeC0;
+                            float e0c3 = n0X * tileMaxX + n0Y * tileMaxY + tri.edgeC0;
+
+                            if (e0c0 > 0f && e0c1 > 0f && e0c2 > 0f && e0c3 > 0f)
+                            {
+                                continue;
+                            }
+
+                            float e1c0 = n1X * tileMinX + n1Y * tileMinY + tri.edgeC1;
+                            float e1c1 = n1X * tileMaxX + n1Y * tileMinY + tri.edgeC1;
+                            float e1c2 = n1X * tileMinX + n1Y * tileMaxY + tri.edgeC1;
+                            float e1c3 = n1X * tileMaxX + n1Y * tileMaxY + tri.edgeC1;
+
+                            if (e1c0 > 0f && e1c1 > 0f && e1c2 > 0f && e1c3 > 0f)
+                            {
+                                continue;
+                            }
+
+                            float e2c0 = n2X * tileMinX + n2Y * tileMinY + tri.edgeC2;
+                            float e2c1 = n2X * tileMaxX + n2Y * tileMinY + tri.edgeC2;
+                            float e2c2 = n2X * tileMinX + n2Y * tileMaxY + tri.edgeC2;
+                            float e2c3 = n2X * tileMaxX + n2Y * tileMaxY + tri.edgeC2;
+
+                            if (e2c0 > 0f && e2c1 > 0f && e2c2 > 0f && e2c3 > 0f)
+                            {
+                                continue;
+                            }
+
+                            if (e0c0 <= 0f && e0c1 <= 0f && e0c2 <= 0f && e0c3 <= 0f &&
+                                e1c0 <= 0f && e1c1 <= 0f && e1c2 <= 0f && e1c3 <= 0f &&
+                                e2c0 <= 0f && e2c1 <= 0f && e2c2 <= 0f && e2c3 <= 0f)
+                            {
+                                int fullDestIndex = (tileIndex * 128) + triangleCount;
+
+                                TileTriangle fullTileTri = new TileTriangle
+                                {
+                                    triangleIndex = (a * 128) + h,
+
+                                    minx = tileMinX,
+                                    miny = tileMinY,
+                                    maxx = tileMaxX,
+                                    maxy = tileMaxY
+                                };
+
+                                ArrayOfTileTriangles[fullDestIndex] = fullTileTri;
+                                tiles[tileIndex].triangleCount += 1;
+
+                                continue;
+                            }
+
+                            float p00 = e0c0 - tri.edgeC0; float p01 = e0c1 - tri.edgeC0;
+                            float p02 = e0c2 - tri.edgeC0; float p03 = e0c3 - tri.edgeC0;
+                            float tileMinProj0 = MathF.Min(MathF.Min(p00, p01), MathF.Min(p02, p03));
+                            float tileMaxProj0 = MathF.Max(MathF.Max(p00, p01), MathF.Max(p02, p03));
+
+                            if (tileMaxProj0 < triMin0 || tileMinProj0 > triMax0)
+                            {
+                                continue;
+                            }
+
+                            float p10 = e1c0 - tri.edgeC1; float p11 = e1c1 - tri.edgeC1;
+                            float p12 = e1c2 - tri.edgeC1; float p13 = e1c3 - tri.edgeC1;
+                            float tileMinProj1 = MathF.Min(MathF.Min(p10, p11), MathF.Min(p12, p13));
+                            float tileMaxProj1 = MathF.Max(MathF.Max(p10, p11), MathF.Max(p12, p13));
+
+                            if (tileMaxProj1 < triMin1 || tileMinProj1 > triMax1)
+                            {
+                                continue;
+                            }
+
+                            float p20 = e2c0 - tri.edgeC2; float p21 = e2c1 - tri.edgeC2;
+                            float p22 = e2c2 - tri.edgeC2; float p23 = e2c3 - tri.edgeC2;
+                            float tileMinProj2 = MathF.Min(MathF.Min(p20, p21), MathF.Min(p22, p23));
+                            float tileMaxProj2 = MathF.Max(MathF.Max(p20, p21), MathF.Max(p22, p23));
+
+                            if (tileMaxProj2 < triMin2 || tileMinProj2 > triMax2)
+                            {
+                                continue;
+                            }
+
+                            int partialDestIndex = (tileIndex * 128) + triangleCount;
+
+                            TileTriangle partialTileTri = new TileTriangle
+                            {
+                                triangleIndex = (a * 128) + h,
+
+                                minx = tileMinX,
+                                miny = tileMinY,
+                                maxx = tileMaxX,
+                                maxy = tileMaxY
+                            };
+
+                            ArrayOfTileTriangles[partialDestIndex] = partialTileTri;
+                            tiles[tileIndex].triangleCount += 1;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -1516,823 +2089,114 @@ public static class LevelFunctions
         return new Vector4(xmin, ymin, xmax, ymax);
     }
 
-    public static void ClipTrianglesWithRectangles(int count, Vector4[] rectangles, MeshMeta world, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, List<Triangle> triangles, Matrix4x4 CamViewProj, int Width, int Height, int[] ArrayOfInts, Tile[] tiles, int tilesX, int tilesY, int frameAlternate, int texWidth, int texHeight, int tileSizeX, int tileSizeY, Vector3 lightDir)
+    public static void DrawTiles(Tile[] tiles, TileTriangle[] ArrayOfTileTriangles, Triangle[] ArrayOfTriangles, int Width, int Height, int texWidth, int texHeight, int maskX, int maskY, uint[] sampleTexture, uint[] backBuffer, float[] depthBuffer)
     {
-        for (int i = 0; i < count; i++)
+        int totalTiles = tiles.Length;
+        for (int t = 0; t < totalTiles; t++)
         {
-            Vector4 rectangle = rectangles[i];
-
-            int portalXmin = (int)MathF.Floor((rectangle.X * 0.5f + 0.5f) * Width);
-            int portalYmin = (int)MathF.Floor((1.0f - (rectangle.W * 0.5f + 0.5f)) * Height);
-            int portalXmax = (int)MathF.Ceiling((rectangle.Z * 0.5f + 0.5f) * Width);
-            int portalYmax = (int)MathF.Ceiling((1.0f - (rectangle.Y * 0.5f + 0.5f)) * Height);
-
-            portalXmin = Math.Clamp(portalXmin, 0, Width - 1);
-            portalYmin = Math.Clamp(portalYmin, 0, Height - 1);
-            portalXmax = Math.Clamp(portalXmax, 0, Width - 1);
-            portalYmax = Math.Clamp(portalYmax, 0, Height - 1);
-
-            if (portalXmin >= portalXmax || portalYmin >= portalYmax)
+            Tile tile = tiles[t];
+            if (tile.triangleCount == 0)
             {
                 continue;
             }
 
-            for (int a = world.indicesStartIndex; a < world.indicesStartIndex + world.indicesCount; a += 3)
+            int startOffset = t * 128;
+
+            for (int bt = 0; bt < tile.triangleCount; bt++)
             {
-                Vector3 world0 = vertices[indices[a]];
-                Vector3 world1 = vertices[indices[a + 1]];
-                Vector3 world2 = vertices[indices[a + 2]];
+                var tt = ArrayOfTileTriangles[startOffset + bt];
 
-                Vector3 edge1 = world1 - world0;
-                Vector3 edge2 = world2 - world0;
-                Vector3 normal = Vector3.Normalize(Vector3.Cross(edge1, edge2));
-                Vector3 camDir = Vector3.Normalize(CamPosition - world0);
-                float triangleDir = Vector3.Dot(normal, camDir);
+                int triId = tt.triangleIndex;
+                Triangle tri = ArrayOfTriangles[triId];
 
-                if (triangleDir < 0)
+                int startY = tt.miny;
+                int endY = tt.maxy;
+                int startX = tt.minx;
+                int endX = tt.maxx;
+
+                if (startX >= endX || startY >= endY)
                 {
                     continue;
                 }
 
-                Vector4 clip0 = ConvertWorldToClip(CamViewProj, world0);
-                Vector4 clip1 = ConvertWorldToClip(CamViewProj, world1);
-                Vector4 clip2 = ConvertWorldToClip(CamViewProj, world2);
+                float startPx = startX + 0.5f;
+                float startPy = startY + 0.5f;
 
-                int processverticescount = 0;
-                int processtexturescount = 0;
-                int processnormalscount = 0;
-                int processboolcount = 0;
+                float edgeRow0 = tri.edgeA0 * startPx + tri.edgeB0 * startPy + tri.edgeC0;
+                float edgeRow1 = tri.edgeA1 * startPx + tri.edgeB1 * startPy + tri.edgeC1;
+                float edgeRow2 = tri.edgeA2 * startPx + tri.edgeB2 * startPy + tri.edgeC2;
 
-                processvertices[processverticescount] = clip0;
-                processvertices[processverticescount + 1] = clip1;
-                processvertices[processverticescount + 2] = clip2;
-                processverticescount += 3;
-                processtextures[processtexturescount] = textures[indices[a]];
-                processtextures[processtexturescount + 1] = textures[indices[a + 1]];
-                processtextures[processtexturescount + 2] = textures[indices[a + 2]];
-                processtexturescount += 3;
-                processnormals[processnormalscount] = normals[indices[a]];
-                processnormals[processnormalscount + 1] = normals[indices[a + 1]];
-                processnormals[processnormalscount + 2] = normals[indices[a + 2]];
-                processnormalscount += 3;
-                processbool[processboolcount] = true;
-                processbool[processboolcount + 1] = true;
-                processbool[processboolcount + 2] = true;
-                processboolcount += 3;
+                float startW0 = edgeRow0 * tri.invArea;
+                float startW1 = edgeRow1 * tri.invArea;
+                float startW2 = edgeRow2 * tri.invArea;
 
-                for (int b = 0; b < 2; b++)
+                float rowW = startW0 * tri.invw0 + startW1 * tri.invw1 + startW2 * tri.invw2;
+                float rowZ = startW0 * tri.invz0 + startW1 * tri.invz1 + startW2 * tri.invz2;
+                float rowU = startW0 * tri.invuv0.X + startW1 * tri.invuv1.X + startW2 * tri.invuv2.X;
+                float rowV = startW0 * tri.invuv0.Y + startW1 * tri.invuv1.Y + startW2 * tri.invuv2.Y;
+
+                float diffuse = tri.diffuse;
+
+                for (int y = startY; y < endY; y++)
                 {
-                    int AddTriangles = 0;
+                    int p = y * Width + startX;
 
-                    int temporaryverticescount = 0;
-                    int temporarytexturescount = 0;
-                    int temporarynormalscount = 0;
+                    float edge0 = edgeRow0;
+                    float edge1 = edgeRow1;
+                    float edge2 = edgeRow2;
 
-                    for (int c = 0; c < processverticescount; c += 3)
+                    float incW = rowW;
+                    float incZ = rowZ;
+                    float incU = rowU;
+                    float incV = rowV;
+
+                    for (int x = startX; x < endX; x++)
                     {
-                        if (processbool[c] == false && processbool[c + 1] == false && processbool[c + 2] == false)
+                        if (edge0 <= 0f && edge1 <= 0f && edge2 <= 0f)
                         {
-                            continue;
+                            float invWeight = 1.0f / incW;
+                            float z = incZ * invWeight;
+
+                            if (z < depthBuffer[p])
+                            {
+                                depthBuffer[p] = z;
+
+                                float texX = incU * invWeight;
+                                float texY = incV * invWeight;
+
+                                int tx = ((int)texX - (texX < 0 ? 1 : 0)) & maskX;
+                                int ty = ((int)texY - (texY < 0 ? 1 : 0)) & maskY;
+
+                                uint col = sampleTexture[ty * texWidth + tx];
+
+                                byte r = (byte)(((col >> 0) & 255) * diffuse);
+                                byte g = (byte)(((col >> 8) & 255) * diffuse);
+                                byte b = (byte)(((col >> 16) & 255) * diffuse);
+                                byte a = (byte)((col >> 24) & 255);
+
+                                backBuffer[p] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
+                            }
                         }
 
-                        Vector4 v0 = processvertices[c];
-                        Vector4 v1 = processvertices[c + 1];
-                        Vector4 v2 = processvertices[c + 2];
+                        edge0 += tri.edgeA0;
+                        edge1 += tri.edgeA1;
+                        edge2 += tri.edgeA2;
 
-                        Vector2 uv0 = processtextures[c];
-                        Vector2 uv1 = processtextures[c + 1];
-                        Vector2 uv2 = processtextures[c + 2];
-
-                        Vector3 n0 = processnormals[c];
-                        Vector3 n1 = processnormals[c + 1];
-                        Vector3 n2 = processnormals[c + 2];
-
-                        float d0, d1, d2;
-
-                        switch (b)
-                        {
-                            case 0: // Near
-                                d0 = v0.Z;
-                                d1 = v1.Z;
-                                d2 = v2.Z;
-                                break;
-
-                            case 1: // Far
-                                d0 = v0.W - v0.Z;
-                                d1 = v1.W - v1.Z;
-                                d2 = v2.W - v2.Z;
-                                break;
-
-                            default:
-                                d0 = 0;
-                                d1 = 0;
-                                d2 = 0;
-                                break;
-                        }
-
-                        bool b0 = d0 >= 0;
-                        bool b1 = d1 >= 0;
-                        bool b2 = d2 >= 0;
-
-                        if (b0 && b1 && b2)
-                        {
-                            continue;
-                        }
-                        else if ((b0 && !b1 && !b2) || (!b0 && b1 && !b2) || (!b0 && !b1 && b2))
-                        {
-                            Vector4 inV, outV1, outV2;
-                            Vector2 inUV, outUV1, outUV2;
-                            Vector3 inN, outN1, outN2;
-                            float inD, outD1, outD2;
-
-                            if (b0)
-                            {
-                                inV = v0;
-                                inUV = uv0;
-                                inN = n0;
-                                inD = d0;
-                                outV1 = v1;
-                                outUV1 = uv1;
-                                outN1 = n1;
-                                outD1 = d1;
-                                outV2 = v2;
-                                outUV2 = uv2;
-                                outN2 = n2;
-                                outD2 = d2;
-                            }
-                            else if (b1)
-                            {
-                                inV = v1;
-                                inUV = uv1;
-                                inN = n1;
-                                inD = d1;
-                                outV1 = v2;
-                                outUV1 = uv2;
-                                outN1 = n2;
-                                outD1 = d2;
-                                outV2 = v0;
-                                outUV2 = uv0;
-                                outN2 = n0;
-                                outD2 = d0;
-                            }
-                            else
-                            {
-                                inV = v2;
-                                inUV = uv2;
-                                inN = n2;
-                                inD = d2;
-                                outV1 = v0;
-                                outUV1 = uv0;
-                                outN1 = n0;
-                                outD1 = d0;
-                                outV2 = v1;
-                                outUV2 = uv1;
-                                outN2 = n1;
-                                outD2 = d1;
-                            }
-
-                            float t1 = inD / (inD - outD1);
-                            float t2 = inD / (inD - outD2);
-
-                            temporaryvertices[temporaryverticescount] = inV;
-                            temporaryvertices[temporaryverticescount + 1] = Vector4.Lerp(inV, outV1, t1);
-                            temporaryvertices[temporaryverticescount + 2] = Vector4.Lerp(inV, outV2, t2);
-                            temporaryverticescount += 3;
-                            temporarytextures[temporarytexturescount] = inUV;
-                            temporarytextures[temporarytexturescount + 1] = Vector2.Lerp(inUV, outUV1, t1);
-                            temporarytextures[temporarytexturescount + 2] = Vector2.Lerp(inUV, outUV2, t2);
-                            temporarytexturescount += 3;
-                            temporarynormals[temporarynormalscount] = inN;
-                            temporarynormals[temporarynormalscount + 1] = Vector3.Normalize(Vector3.Lerp(inN, outN1, t1));
-                            temporarynormals[temporarynormalscount + 2] = Vector3.Normalize(Vector3.Lerp(inN, outN2, t2));
-                            temporarynormalscount += 3;
-                            processbool[c] = false;
-                            processbool[c + 1] = false;
-                            processbool[c + 2] = false;
-
-                            AddTriangles += 1;
-                        }
-                        else if ((!b0 && b1 && b2) || (b0 && !b1 && b2) || (b0 && b1 && !b2))
-                        {
-                            Vector4 inV1, inV2, outV;
-                            Vector2 inUV1, inUV2, outUV;
-                            Vector3 inN1, inN2, outN;
-                            float inD1, inD2, outD;
-
-                            if (!b0)
-                            {
-                                outV = v0;
-                                outUV = uv0;
-                                outN = n0;
-                                outD = d0;
-                                inV1 = v1;
-                                inUV1 = uv1;
-                                inN1 = n1;
-                                inD1 = d1;
-                                inV2 = v2;
-                                inUV2 = uv2;
-                                inN2 = n2;
-                                inD2 = d2;
-                            }
-                            else if (!b1)
-                            {
-                                outV = v1;
-                                outUV = uv1;
-                                outN = n1;
-                                outD = d1;
-                                inV1 = v2;
-                                inUV1 = uv2;
-                                inN1 = n2;
-                                inD1 = d2;
-                                inV2 = v0;
-                                inUV2 = uv0;
-                                inN2 = n0;
-                                inD2 = d0;
-                            }
-                            else
-                            {
-                                outV = v2;
-                                outUV = uv2;
-                                outN = n2;
-                                outD = d2;
-                                inV1 = v0;
-                                inUV1 = uv0;
-                                inN1 = n0;
-                                inD1 = d0;
-                                inV2 = v1;
-                                inUV2 = uv1;
-                                inN2 = n1;
-                                inD2 = d1;
-                            }
-
-                            float t1 = inD1 / (inD1 - outD);
-                            float t2 = inD2 / (inD2 - outD);
-
-                            Vector4 vA = Vector4.Lerp(inV1, outV, t1);
-                            Vector4 vB = Vector4.Lerp(inV2, outV, t2);
-
-                            Vector2 uvA = Vector2.Lerp(inUV1, outUV, t1);
-                            Vector2 uvB = Vector2.Lerp(inUV2, outUV, t2);
-
-                            Vector3 nA = Vector3.Normalize(Vector3.Lerp(inN1, outN, t1));
-                            Vector3 nB = Vector3.Normalize(Vector3.Lerp(inN2, outN, t2));
-
-                            temporaryvertices[temporaryverticescount] = inV1;
-                            temporaryvertices[temporaryverticescount + 1] = inV2;
-                            temporaryvertices[temporaryverticescount + 2] = vA;
-                            temporaryverticescount += 3;
-                            temporarytextures[temporarytexturescount] = inUV1;
-                            temporarytextures[temporarytexturescount + 1] = inUV2;
-                            temporarytextures[temporarytexturescount + 2] = uvA;
-                            temporarytexturescount += 3;
-                            temporarynormals[temporarynormalscount] = inN1;
-                            temporarynormals[temporarynormalscount + 1] = inN2;
-                            temporarynormals[temporarynormalscount + 2] = nA;
-                            temporarynormalscount += 3;
-                            temporaryvertices[temporaryverticescount] = vA;
-                            temporaryvertices[temporaryverticescount + 1] = inV2;
-                            temporaryvertices[temporaryverticescount + 2] = vB;
-                            temporaryverticescount += 3;
-                            temporarytextures[temporarytexturescount] = uvA;
-                            temporarytextures[temporarytexturescount + 1] = inUV2;
-                            temporarytextures[temporarytexturescount + 2] = uvB;
-                            temporarytexturescount += 3;
-                            temporarynormals[temporarynormalscount] = nA;
-                            temporarynormals[temporarynormalscount + 1] = inN2;
-                            temporarynormals[temporarynormalscount + 2] = nB;
-                            temporarynormalscount += 3;
-                            processbool[c] = false;
-                            processbool[c + 1] = false;
-                            processbool[c + 2] = false;
-
-                            AddTriangles += 2;
-                        }
-                        else
-                        {
-                            processbool[c] = false;
-                            processbool[c + 1] = false;
-                            processbool[c + 2] = false;
-                        }
+                        incW += tri.invwx;
+                        incZ += tri.invzx;
+                        incU += tri.invux;
+                        incV += tri.invvx;
+                        p += 1;
                     }
 
-                    if (AddTriangles > 0)
-                    {
-                        for (int d = 0; d < temporaryverticescount; d += 3)
-                        {
-                            processvertices[processverticescount] = temporaryvertices[d];
-                            processvertices[processverticescount + 1] = temporaryvertices[d + 1];
-                            processvertices[processverticescount + 2] = temporaryvertices[d + 2];
-                            processverticescount += 3;
-                            processtextures[processtexturescount] = temporarytextures[d];
-                            processtextures[processtexturescount + 1] = temporarytextures[d + 1];
-                            processtextures[processtexturescount + 2] = temporarytextures[d + 2];
-                            processtexturescount += 3;
-                            processnormals[processnormalscount] = temporarynormals[d];
-                            processnormals[processnormalscount + 1] = temporarynormals[d + 1];
-                            processnormals[processnormalscount + 2] = temporarynormals[d + 2];
-                            processnormalscount += 3;
-                            processbool[processboolcount] = true;
-                            processbool[processboolcount + 1] = true;
-                            processbool[processboolcount + 2] = true;
-                            processboolcount += 3;
-                        }
-                    }
-                }
-
-                for (int e = 0; e < processboolcount; e += 3)
-                {
-                    if (processbool[e] == true && processbool[e + 1] == true && processbool[e + 2] == true)
-                    {
-                        Triangle tri = new Triangle();
-
-                        float invw0 = 1.0f / processvertices[e].W;
-                        float invw1 = 1.0f / processvertices[e + 1].W;
-                        float invw2 = 1.0f / processvertices[e + 2].W;
-
-                        Vector2 screen0 = new((processvertices[e].X * invw0 * 0.5f + 0.5f) * Width, (1.0f - (processvertices[e].Y * invw0 * 0.5f + 0.5f)) * Height);
-                        Vector2 screen1 = new((processvertices[e + 1].X * invw1 * 0.5f + 0.5f) * Width, (1.0f - (processvertices[e + 1].Y * invw1 * 0.5f + 0.5f)) * Height);
-                        Vector2 screen2 = new((processvertices[e + 2].X * invw2 * 0.5f + 0.5f) * Width, (1.0f - (processvertices[e + 2].Y * invw2 * 0.5f + 0.5f)) * Height);
-
-                        float area = (screen0.Y - screen1.Y) * screen2.X +
-                                     (screen1.X - screen0.X) * screen2.Y +
-                                     (screen0.X * screen1.Y - screen0.Y * screen1.X);
-
-                        if (MathF.Abs(area) < 1e-5f || area > 0f)
-                        {
-                            continue;
-                        }
-
-                        int triXmin = (int)MathF.Floor(MathF.Min(screen0.X, MathF.Min(screen1.X, screen2.X)));
-                        int triYmin = (int)MathF.Floor(MathF.Min(screen0.Y, MathF.Min(screen1.Y, screen2.Y)));
-                        int triXmax = (int)MathF.Ceiling(MathF.Max(screen0.X, MathF.Max(screen1.X, screen2.X)));
-                        int triYmax = (int)MathF.Ceiling(MathF.Max(screen0.Y, MathF.Max(screen1.Y, screen2.Y)));
-
-                        int finalXmin = Math.Max(triXmin, portalXmin);
-                        int finalYmin = Math.Max(triYmin, portalYmin);
-                        int finalXmax = Math.Min(triXmax, portalXmax);
-                        int finalYmax = Math.Min(triYmax, portalYmax);
-
-                        if (finalXmin >= finalXmax || finalYmin >= finalYmax)
-                        {
-                            continue;
-                        }
-
-                        tri.invz0 = processvertices[e].Z * invw0;
-                        tri.invz1 = processvertices[e + 1].Z * invw1;
-                        tri.invz2 = processvertices[e + 2].Z * invw2;
-
-                        tri.invuv0 = new(processtextures[e].X * invw0, processtextures[e].Y * invw0);
-                        tri.invuv1 = new(processtextures[e + 1].X * invw1, processtextures[e + 1].Y * invw1);
-                        tri.invuv2 = new(processtextures[e + 2].X * invw2, processtextures[e + 2].Y * invw2);
-
-                        tri.invw0 = invw0;
-                        tri.invw1 = invw1;
-                        tri.invw2 = invw2;
-
-                        tri.screen0 = screen0;
-                        tri.screen1 = screen1;
-                        tri.screen2 = screen2;
-
-                        tri.invArea = 1.0f / area;
-
-                        tri.edgeA0 = tri.screen1.Y - tri.screen2.Y;
-                        tri.edgeB0 = tri.screen2.X - tri.screen1.X;
-                        tri.edgeC0 = tri.screen1.X * tri.screen2.Y - tri.screen1.Y * tri.screen2.X;
-
-                        tri.edgeA1 = tri.screen2.Y - tri.screen0.Y;
-                        tri.edgeB1 = tri.screen0.X - tri.screen2.X;
-                        tri.edgeC1 = tri.screen2.X * tri.screen0.Y - tri.screen2.Y * tri.screen0.X;
-
-                        tri.edgeA2 = tri.screen0.Y - tri.screen1.Y;
-                        tri.edgeB2 = tri.screen1.X - tri.screen0.X;
-                        tri.edgeC2 = tri.screen0.X * tri.screen1.Y - tri.screen0.Y * tri.screen1.X;
-
-                        float a0 = tri.edgeA0 * tri.invArea;
-                        float a1 = tri.edgeA1 * tri.invArea; 
-                        float a2 = tri.edgeA2 * tri.invArea; 
-
-                        float b0 = tri.edgeB0 * tri.invArea;
-                        float b1 = tri.edgeB1 * tri.invArea;
-                        float b2 = tri.edgeB2 * tri.invArea;
-
-                        tri.xmin = finalXmin;
-                        tri.ymin = finalYmin;
-                        tri.xmax = finalXmax;
-                        tri.ymax = finalYmax;
-
-                        tri.invuv0.X = tri.invuv0.X * texWidth;
-                        tri.invuv0.Y = tri.invuv0.Y * texHeight;
-
-                        tri.invuv1.X = tri.invuv1.X * texWidth;
-                        tri.invuv1.Y = tri.invuv1.Y * texHeight;
-
-                        tri.invuv2.X = tri.invuv2.X * texWidth;
-                        tri.invuv2.Y = tri.invuv2.Y * texHeight;
-
-                        tri.invwx = a0 * tri.invw0 + a1 * tri.invw1 + a2 * tri.invw2;
-                        tri.invwy = b0 * tri.invw0 + b1 * tri.invw1 + b2 * tri.invw2;
-
-                        tri.invzx = a0 * tri.invz0 + a1 * tri.invz1 + a2 * tri.invz2;
-                        tri.invzy = b0 * tri.invz0 + b1 * tri.invz1 + b2 * tri.invz2;
-
-                        tri.invux = a0 * tri.invuv0.X + a1 * tri.invuv1.X + a2 * tri.invuv2.X;
-                        tri.invuy = b0 * tri.invuv0.X + b1 * tri.invuv1.X + b2 * tri.invuv2.X;
-
-                        tri.invvx = a0 * tri.invuv0.Y + a1 * tri.invuv1.Y + a2 * tri.invuv2.Y;
-                        tri.invvy = b0 * tri.invuv0.Y + b1 * tri.invuv1.Y + b2 * tri.invuv2.Y;
-
-                        tri.triangleId = triangles.Count;
-
-                        float rawDiffuse = Vector3.Dot(processnormals[e], lightDir) * 0.5f + 0.5f;
-
-                        rawDiffuse = MathF.Min(1.0f, (rawDiffuse * rawDiffuse) + 0.2f);
-
-                        tri.diffuse = Math.Clamp(rawDiffuse, 0.0f, 1.0f);
-
-                        int startTileX = Math.Clamp(tri.xmin / tileSizeX, 0, tilesX - 1);
-                        int endTileX = Math.Clamp(tri.xmax / tileSizeX, 0, tilesX - 1);
-                        int startTileY = Math.Clamp(tri.ymin / tileSizeY, 0, tilesY - 1);
-                        int endTileY = Math.Clamp(tri.ymax / tileSizeY, 0, tilesY - 1);
-
-                        float n0X = tri.edgeA0; float n0Y = tri.edgeB0;
-                        float n1X = tri.edgeA1; float n1Y = tri.edgeB1;
-                        float n2X = tri.edgeA2; float n2Y = tri.edgeB2;
-
-                        float triMin0 = MathF.Min(n0X * tri.screen0.X + n0Y * tri.screen0.Y, n0X * tri.screen2.X + n0Y * tri.screen2.Y);
-                        float triMax0 = MathF.Max(n0X * tri.screen0.X + n0Y * tri.screen0.Y, n0X * tri.screen2.X + n0Y * tri.screen2.Y);
-
-                        float triMin1 = MathF.Min(n1X * tri.screen1.X + n1Y * tri.screen1.Y, n1X * tri.screen0.X + n1Y * tri.screen0.Y);
-                        float triMax1 = MathF.Max(n1X * tri.screen1.X + n1Y * tri.screen1.Y, n1X * tri.screen0.X + n1Y * tri.screen0.Y);
-
-                        float triMin2 = MathF.Min(n2X * tri.screen2.X + n2Y * tri.screen2.Y, n2X * tri.screen1.X + n2Y * tri.screen1.Y);
-                        float triMax2 = MathF.Max(n2X * tri.screen2.X + n2Y * tri.screen2.Y, n2X * tri.screen1.X + n2Y * tri.screen1.Y);
-
-                        for (int y = startTileY; y <= endTileY; y++)
-                        {
-                            for (int x = startTileX; x <= endTileX; x++)
-                            {
-                                int tileIndex = y * tilesX + x;
-                                Tile tile = tiles[tileIndex];
-
-                                if (tiles[tileIndex].frameFlag != frameAlternate)
-                                {
-                                    tiles[tileIndex].intsCount = 0;
-                                    tiles[tileIndex].frameFlag = frameAlternate;
-                                }
-
-                                int intCount = tiles[tileIndex].intsCount;
-
-                                float tileMinX = tile.minx;
-                                float tileMinY = tile.miny;
-                                float tileMaxX = tile.maxx;
-                                float tileMaxY = tile.maxy;
-
-                                float e0c0 = n0X * tileMinX + n0Y * tileMinY + tri.edgeC0;
-                                float e0c1 = n0X * tileMaxX + n0Y * tileMinY + tri.edgeC0;
-                                float e0c2 = n0X * tileMinX + n0Y * tileMaxY + tri.edgeC0;
-                                float e0c3 = n0X * tileMaxX + n0Y * tileMaxY + tri.edgeC0;
-
-                                if (e0c0 > 0f && e0c1 > 0f && e0c2 > 0f && e0c3 > 0f)
-                                {
-                                    continue;
-                                }
-
-                                float e1c0 = n1X * tileMinX + n1Y * tileMinY + tri.edgeC1;
-                                float e1c1 = n1X * tileMaxX + n1Y * tileMinY + tri.edgeC1;
-                                float e1c2 = n1X * tileMinX + n1Y * tileMaxY + tri.edgeC1;
-                                float e1c3 = n1X * tileMaxX + n1Y * tileMaxY + tri.edgeC1;
-
-                                if (e1c0 > 0f && e1c1 > 0f && e1c2 > 0f && e1c3 > 0f)
-                                {
-                                    continue;
-                                }
-
-                                float e2c0 = n2X * tileMinX + n2Y * tileMinY + tri.edgeC2;
-                                float e2c1 = n2X * tileMaxX + n2Y * tileMinY + tri.edgeC2;
-                                float e2c2 = n2X * tileMinX + n2Y * tileMaxY + tri.edgeC2;
-                                float e2c3 = n2X * tileMaxX + n2Y * tileMaxY + tri.edgeC2;
-
-                                if (e2c0 > 0f && e2c1 > 0f && e2c2 > 0f && e2c3 > 0f)
-                                {
-                                    continue;
-                                }
-
-                                if (e0c0 <= 0f && e0c1 <= 0f && e0c2 <= 0f && e0c3 <= 0f &&
-                                    e1c0 <= 0f && e1c1 <= 0f && e1c2 <= 0f && e1c3 <= 0f &&
-                                    e2c0 <= 0f && e2c1 <= 0f && e2c2 <= 0f && e2c3 <= 0f)
-                                {
-                                    if (intCount < 128)
-                                    {
-                                        int destIndex = (tileIndex * 128) + intCount;
-                                        ArrayOfInts[destIndex] = tri.triangleId;
-                                        tiles[tileIndex].intsCount++;
-                                    }
-                                    continue;
-                                }
-
-                                float p00 = e0c0 - tri.edgeC0; float p01 = e0c1 - tri.edgeC0;
-                                float p02 = e0c2 - tri.edgeC0; float p03 = e0c3 - tri.edgeC0;
-                                float tileMinProj0 = MathF.Min(MathF.Min(p00, p01), MathF.Min(p02, p03));
-                                float tileMaxProj0 = MathF.Max(MathF.Max(p00, p01), MathF.Max(p02, p03));
-
-                                if (tileMaxProj0 < triMin0 || tileMinProj0 > triMax0)
-                                {
-                                    continue;
-                                }
-
-                                float p10 = e1c0 - tri.edgeC1; float p11 = e1c1 - tri.edgeC1;
-                                float p12 = e1c2 - tri.edgeC1; float p13 = e1c3 - tri.edgeC1;
-                                float tileMinProj1 = MathF.Min(MathF.Min(p10, p11), MathF.Min(p12, p13));
-                                float tileMaxProj1 = MathF.Max(MathF.Max(p10, p11), MathF.Max(p12, p13));
-
-                                if (tileMaxProj1 < triMin1 || tileMinProj1 > triMax1)
-                                {
-                                    continue;
-                                }
-
-                                float p20 = e2c0 - tri.edgeC2; float p21 = e2c1 - tri.edgeC2;
-                                float p22 = e2c2 - tri.edgeC2; float p23 = e2c3 - tri.edgeC2;
-                                float tileMinProj2 = MathF.Min(MathF.Min(p20, p21), MathF.Min(p22, p23));
-                                float tileMaxProj2 = MathF.Max(MathF.Max(p20, p21), MathF.Max(p22, p23));
-
-                                if (tileMaxProj2 < triMin2 || tileMinProj2 > triMax2)
-                                {
-                                    continue;
-                                }
-
-                                if (intCount < 128)
-                                {
-                                    int destIndex = (tileIndex * 128) + intCount;
-                                    ArrayOfInts[destIndex] = tri.triangleId;
-                                    tiles[tileIndex].intsCount++;
-                                }
-                            }
-                        }
-
-                        triangles.Add(tri);
-                    }
-                }
-            }
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
-    public static void DrawTiles(Tile[] tiles, int[] ArrayOfInts, List<Triangle> triangles, int Width, int Height, int texWidth, int texHeight, int maskX, int maskY, uint[] sampleTexture, uint[] backBuffer, float[] depthBuffer)
-    {
-        if (Avx2.IsSupported)
-        {
-            int totalTiles = tiles.Length;
-            int maxMemoryIndex = Width * Height;
-
-            Vector256<int> v_xIndices = Vector256.Create(0, 1, 2, 3, 4, 5, 6, 7);
-            Vector256<float> v_laneSteps = Vector256.Create(0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f);
-            Vector256<float> v_zero = Vector256<float>.Zero;
-            Vector256<float> v_one = Vector256.Create(1.0f);
-            Vector256<int> v_maskX = Vector256.Create(maskX);
-            Vector256<int> v_maskY = Vector256.Create(maskY);
-            Vector256<int> v_texWidth = Vector256.Create(texWidth);
-            Vector256<uint> v_channelMask = Vector256.Create(255u);
-
-            ref float depthBufferRef = ref MemoryMarshal.GetArrayDataReference(depthBuffer);
-            ref uint backBufferRef = ref MemoryMarshal.GetArrayDataReference(backBuffer);
-            ref int arrayOfIntsRef = ref MemoryMarshal.GetArrayDataReference(ArrayOfInts);
-            ref uint sampleTexRef = ref MemoryMarshal.GetArrayDataReference(sampleTexture);
-
-            for (int t = 0; t < totalTiles; t++)
-            {
-                Tile tile = tiles[t];
-                if (tile.intsCount == 0) continue;
-
-                int tileMinX = tile.minx;
-                int tileMaxX = tile.maxx;
-                int tileMinY = tile.miny;
-                int tileMaxY = tile.maxy;
-                int startOffset = t * 128;
-
-                Vector256<int> v_tileXInt = Vector256.Create(tileMinX) + v_xIndices;
-                Vector256<int> v_startX = Vector256.Create(Math.Max(tileMinX, tile.minx));
-                Vector256<int> v_endX = Vector256.Create(Math.Min(tileMaxX - 1, tile.maxx));
-                Vector256<int> v_bboxMask = Vector256.GreaterThanOrEqual(v_tileXInt, v_startX) & Vector256.LessThanOrEqual(v_tileXInt, v_endX);
-
-                for (int bt = 0; bt < tile.intsCount; bt++)
-                {
-                    int triId = Unsafe.Add(ref arrayOfIntsRef, startOffset + bt);
-                    Triangle tri = triangles[triId];
-
-                    int startY = Math.Max(tileMinY, tri.ymin);
-                    int endY = Math.Min(tileMaxY - 1, tri.ymax);
-                    int startX = Math.Max(tileMinX, tri.xmin);
-                    int endX = Math.Min(tileMaxX - 1, tri.xmax);
-
-                    if (startX > endX || startY > endY) continue;
-
-                    Vector256<float> v_startPx = Vector256.Create(tileMinX + 0.5f);
-                    Vector256<float> v_startPy = Vector256.Create(startY + 0.5f);
-
-                    Vector256<float> v_edgeRow0 = (Vector256.Create(tri.edgeA0) * v_startPx) + (Vector256.Create(tri.edgeB0) * v_startPy) + Vector256.Create(tri.edgeC0);
-                    Vector256<float> v_edgeRow1 = (Vector256.Create(tri.edgeA1) * v_startPx) + (Vector256.Create(tri.edgeB1) * v_startPy) + Vector256.Create(tri.edgeC1);
-                    Vector256<float> v_edgeRow2 = (Vector256.Create(tri.edgeA2) * v_startPx) + (Vector256.Create(tri.edgeB2) * v_startPy) + Vector256.Create(tri.edgeC2);
-
-                    Vector256<float> v_invArea = Vector256.Create(tri.invArea);
-                    Vector256<float> v_startW0 = v_edgeRow0 * v_invArea;
-                    Vector256<float> v_startW1 = v_edgeRow1 * v_invArea;
-                    Vector256<float> v_startW2 = v_edgeRow2 * v_invArea;
-
-                    Vector256<float> v_baseW = (v_startW0 * Vector256.Create(tri.invw0)) + (v_startW1 * Vector256.Create(tri.invw1)) + (v_startW2 * Vector256.Create(tri.invw2));
-                    Vector256<float> v_baseZ = (v_startW0 * Vector256.Create(tri.invz0)) + (v_startW1 * Vector256.Create(tri.invz1)) + (v_startW2 * Vector256.Create(tri.invz2));
-                    Vector256<float> v_baseU = (v_startW0 * Vector256.Create(tri.invuv0.X)) + (v_startW1 * Vector256.Create(tri.invuv1.X)) + (v_startW2 * Vector256.Create(tri.invuv2.X));
-                    Vector256<float> v_baseV = (v_startW0 * Vector256.Create(tri.invuv0.Y)) + (v_startW1 * Vector256.Create(tri.invuv1.Y)) + (v_startW2 * Vector256.Create(tri.invuv2.Y));
-
-                    Vector256<float> v_edgeA0 = Vector256.Create(tri.edgeA0); Vector256<float> v_edgeB0 = Vector256.Create(tri.edgeB0);
-                    Vector256<float> v_edgeA1 = Vector256.Create(tri.edgeA1); Vector256<float> v_edgeB1 = Vector256.Create(tri.edgeB1);
-                    Vector256<float> v_edgeA2 = Vector256.Create(tri.edgeA2); Vector256<float> v_edgeB2 = Vector256.Create(tri.edgeB2);
-
-                    Vector256<float> v_invwx = Vector256.Create(tri.invwx); Vector256<float> v_invwy = Vector256.Create(tri.invwy);
-                    Vector256<float> v_invzx = Vector256.Create(tri.invzx); Vector256<float> v_invzy = Vector256.Create(tri.invzy);
-                    Vector256<float> v_invux = Vector256.Create(tri.invux); Vector256<float> v_invuy = Vector256.Create(tri.invuy);
-                    Vector256<float> v_invvx = Vector256.Create(tri.invvx); Vector256<float> v_invvy = Vector256.Create(tri.invvy);
-
-                    Vector256<uint> v_diffuse = Vector256.Create((uint)(tri.diffuse * 255.0f));
-
-                    for (int y = startY; y <= endY; y++)
-                    {
-                        int memoryOffset = y * Width + tileMinX;
-                        if (memoryOffset < 0 || memoryOffset >= maxMemoryIndex) continue;
-
-                        Vector256<float> v_edge0 = v_edgeRow0 + (v_edgeA0 * v_laneSteps);
-                        Vector256<float> v_edge1 = v_edgeRow1 + (v_edgeA1 * v_laneSteps);
-                        Vector256<float> v_edge2 = v_edgeRow2 + (v_edgeA2 * v_laneSteps);
-
-                        Vector256<int> mask0 = Vector256.LessThanOrEqual(v_edge0, v_zero).AsInt32();
-                        Vector256<int> mask1 = Vector256.LessThanOrEqual(v_edge1, v_zero).AsInt32();
-                        Vector256<int> mask2 = Vector256.LessThanOrEqual(v_edge2, v_zero).AsInt32();
-
-                        Vector256<int> v_executionMask = v_bboxMask & mask0 & mask1 & mask2;
-                        if (v_executionMask == Vector256<int>.Zero) goto NextRow;
-
-                        Vector256<float> v_incW = v_baseW + (v_invwx * v_laneSteps);
-                        Vector256<float> v_incZ = v_baseZ + (v_invzx * v_laneSteps);
-                        Vector256<float> v_invWeight = v_one / v_incW;
-                        Vector256<float> v_calculatedZ = v_incZ * v_invWeight;
-
-                        Vector256<float> v_currentDepth = Vector256.LoadUnsafe(ref depthBufferRef, (uint)memoryOffset);
-                        v_executionMask &= Vector256.LessThan(v_calculatedZ, v_currentDepth).AsInt32();
-                        if (v_executionMask == Vector256<int>.Zero) goto NextRow;
-
-                        Vector256<float> v_incU = v_baseU + (v_invux * v_laneSteps);
-                        Vector256<float> v_incV = v_baseV + (v_invvx * v_laneSteps);
-
-                        Vector256<int> v_tx = Vector256.ConvertToInt32(v_incU * v_invWeight) & v_maskX;
-                        Vector256<int> v_ty = Vector256.ConvertToInt32(v_incV * v_invWeight) & v_maskY;
-                        Vector256<int> v_textureIndices = (v_ty * v_texWidth) + v_tx;
-
-                        Vector256<uint> v_rawColors = Vector256.Create(
-                            Unsafe.Add(ref sampleTexRef, v_textureIndices.GetElement(0)),
-                            Unsafe.Add(ref sampleTexRef, v_textureIndices.GetElement(1)),
-                            Unsafe.Add(ref sampleTexRef, v_textureIndices.GetElement(2)),
-                            Unsafe.Add(ref sampleTexRef, v_textureIndices.GetElement(3)),
-                            Unsafe.Add(ref sampleTexRef, v_textureIndices.GetElement(4)),
-                            Unsafe.Add(ref sampleTexRef, v_textureIndices.GetElement(5)),
-                            Unsafe.Add(ref sampleTexRef, v_textureIndices.GetElement(6)),
-                            Unsafe.Add(ref sampleTexRef, v_textureIndices.GetElement(7))
-                        );
-
-                        Vector256<uint> r = ((v_rawColors >> 0) & v_channelMask) * v_diffuse >> 8;
-                        Vector256<uint> g = ((v_rawColors >> 8) & v_channelMask) * v_diffuse >> 8;
-                        Vector256<uint> b = ((v_rawColors >> 16) & v_channelMask) * v_diffuse >> 8;
-                        Vector256<uint> a = (v_rawColors >> 24) & v_channelMask;
-                        Vector256<uint> v_calculatedColors = r | (g << 8) | (b << 16) | (a << 24);
-
-                        Vector256<float> v_finalDepth = Vector256.ConditionalSelect(v_executionMask.AsSingle(), v_calculatedZ, v_currentDepth);
-                        Vector256<uint> v_currentColors = Vector256.LoadUnsafe(ref backBufferRef, (uint)memoryOffset);
-                        Vector256<uint> v_finalColors = Vector256.ConditionalSelect(v_executionMask.AsUInt32(), v_calculatedColors, v_currentColors);
-
-                        Vector256.StoreUnsafe(v_finalDepth, ref depthBufferRef, (uint)memoryOffset);
-                        Vector256.StoreUnsafe(v_finalColors, ref backBufferRef, (uint)memoryOffset);
-                    NextRow:
-                        v_edgeRow0 += v_edgeB0;
-                        v_edgeRow1 += v_edgeB1;
-                        v_edgeRow2 += v_edgeB2;
-                        v_baseW += v_invwy;
-                        v_baseZ += v_invzy;
-                        v_baseU += v_invuy;
-                        v_baseV += v_invvy;
-                    }
-                }
-            }
-        }
-        else
-        {
-            int totalTiles = tiles.Length;
-            for (int t = 0; t < totalTiles; t++)
-            {
-                Tile tile = tiles[t];
-                if (tile.intsCount == 0)
-                {
-                    continue;
-                }
-
-                int tileMinX = tile.minx;
-                int tileMaxX = tile.maxx;
-                int tileMinY = tile.miny;
-                int tileMaxY = tile.maxy;
-
-                int startOffset = t * 128;
-
-                for (int bt = 0; bt < tile.intsCount; bt++)
-                {
-                    int triId = ArrayOfInts[startOffset + bt];
-                    Triangle tri = triangles[triId];
-
-                    int startY = Math.Max(tileMinY, tri.ymin);
-                    int endY = Math.Min(tileMaxY - 1, tri.ymax);
-                    int startX = Math.Max(tileMinX, tri.xmin);
-                    int endX = Math.Min(tileMaxX - 1, tri.xmax);
-
-                    if (startX > endX || startY > endY)
-                    {
-                        continue;
-                    }
-
-                    float startPx = startX + 0.5f;
-                    float startPy = startY + 0.5f;
-
-                    float edgeRow0 = tri.edgeA0 * startPx + tri.edgeB0 * startPy + tri.edgeC0;
-                    float edgeRow1 = tri.edgeA1 * startPx + tri.edgeB1 * startPy + tri.edgeC1;
-                    float edgeRow2 = tri.edgeA2 * startPx + tri.edgeB2 * startPy + tri.edgeC2;
-
-                    float startW0 = edgeRow0 * tri.invArea;
-                    float startW1 = edgeRow1 * tri.invArea;
-                    float startW2 = edgeRow2 * tri.invArea;
-
-                    float rowW = startW0 * tri.invw0 + startW1 * tri.invw1 + startW2 * tri.invw2;
-                    float rowZ = startW0 * tri.invz0 + startW1 * tri.invz1 + startW2 * tri.invz2;
-                    float rowU = startW0 * tri.invuv0.X + startW1 * tri.invuv1.X + startW2 * tri.invuv2.X;
-                    float rowV = startW0 * tri.invuv0.Y + startW1 * tri.invuv1.Y + startW2 * tri.invuv2.Y;
-
-                    float diffuse = tri.diffuse;
-
-                    for (int y = startY; y <= endY; y++)
-                    {
-                        int p = y * Width + startX;
-
-                        float edge0 = edgeRow0;
-                        float edge1 = edgeRow1;
-                        float edge2 = edgeRow2;
-
-                        float incW = rowW;
-                        float incZ = rowZ;
-                        float incU = rowU;
-                        float incV = rowV;
-
-                        for (int x = startX; x <= endX; x++)
-                        {
-                            if (edge0 <= 0f && edge1 <= 0f && edge2 <= 0f)
-                            {
-                                float invWeight = 1.0f / incW;
-                                float z = incZ * invWeight;
-
-                                if (z < depthBuffer[p])
-                                {
-                                    depthBuffer[p] = z;
-
-                                    float texX = incU * invWeight;
-                                    float texY = incV * invWeight;
-
-                                    int tx = ((int)texX - (texX < 0 ? 1 : 0)) & maskX;
-                                    int ty = ((int)texY - (texY < 0 ? 1 : 0)) & maskY;
-
-                                    uint col = sampleTexture[ty * texWidth + tx];
-
-                                    byte r = (byte)(((col >> 0) & 255) * diffuse);
-                                    byte g = (byte)(((col >> 8) & 255) * diffuse);
-                                    byte b = (byte)(((col >> 16) & 255) * diffuse);
-                                    byte a = (byte)((col >> 24) & 255);
-
-                                    backBuffer[p] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
-                                }
-                            }
-
-                            edge0 += tri.edgeA0;
-                            edge1 += tri.edgeA1;
-                            edge2 += tri.edgeA2;
-
-                            incW += tri.invwx;
-                            incZ += tri.invzx;
-                            incU += tri.invux;
-                            incV += tri.invvx;
-                            p += 1;
-                        }
-
-                        edgeRow0 += tri.edgeB0;
-                        edgeRow1 += tri.edgeB1;
-                        edgeRow2 += tri.edgeB2;
-
-                        rowW += tri.invwy;
-                        rowZ += tri.invzy;
-                        rowU += tri.invuy;
-                        rowV += tri.invvy;
-                    }
+                    edgeRow0 += tri.edgeB0;
+                    edgeRow1 += tri.edgeB1;
+                    edgeRow2 += tri.edgeB2;
+
+                    rowW += tri.invwy;
+                    rowZ += tri.invzy;
+                    rowU += tri.invuy;
+                    rowV += tri.invvy;
                 }
             }
         }

@@ -46,7 +46,7 @@ public static class LevelDraw
     static List<Vector2> ceilingTextures = new();
 
     static List<Vector3> OutEdgeVertices = new();
-    static List<Triangle> Triangles = new();
+    static Triangle[] Triangles = Array.Empty<Triangle>();
 
     static bool[] boolEdges = new bool[128];
     static Vector4[] processEdges = new Vector4[128];
@@ -62,9 +62,9 @@ public static class LevelDraw
 
     static List<SectorMeta> Sectors = new();
     static List<List<SectorMeta>> ListOfSectorLists = new();
-    static int[] ArrayOfInts = Array.Empty<int>();
+    static TileTriangle[] ArrayOfTileTriangles = Array.Empty<TileTriangle>();
     static Tile[] tiles = new Tile[tilesX * tilesY];
-    static Vector4[][] ArrayOfRectangleArrays = Array.Empty<Vector4[]>();
+    static Vector4[] ArrayOfRectangles = Array.Empty<Vector4>();
     static int[] visibleSectors = Array.Empty<int>();
     static int[] contactingSectors = Array.Empty<int>();
     static int frameAlternate = 0;
@@ -287,8 +287,9 @@ public static class LevelDraw
         InitializeTiles(tilesX, tilesY, tileSizeX, tileSizeY, tiles);
 
         ListOfSectorLists = MakeLists();
-        ArrayOfInts = new int[tiles.Length * 128];
-        ArrayOfRectangleArrays = ArrayOfArraysMake(TopLevelLists.sectors);
+        ArrayOfTileTriangles = new TileTriangle[tiles.Length * 128];
+        Triangles = new Triangle[TopLevelLists.sectors.Count * 128];
+        ArrayOfRectangles = new Vector4[TopLevelLists.sectors.Count * 32];
         visibleSectors = VisibleSectorsMake(TopLevelLists.sectors);
         contactingSectors = contactSectorsMake(TopLevelLists.sectors);
 
@@ -335,7 +336,10 @@ public static class LevelDraw
         {
             while (SDL.PollEvent(out var ev))
             {
-                if ((SDL.EventType)ev.Type == SDL.EventType.Quit) running = false;
+                if ((SDL.EventType)ev.Type == SDL.EventType.Quit)
+                {
+                    running = false;
+                }
             }
             float dt = GetDeltaTime();
             SDLPlayerController.HandleMovement(dt);
@@ -353,27 +357,26 @@ public static class LevelDraw
             );
             Array.Clear(visibleSectors, 0, visibleSectors.Length);
             GetPortals(
-            CurrentSector, ListOfSectorLists, ArrayOfRectangleArrays, visibleSectors,
+            CurrentSector, ListOfSectorLists, ArrayOfRectangles, visibleSectors,
             TopLevelLists.portals, planeDistance, TopLevelLists.planes,
             TopLevelLists.sectors, Sectors, OutEdgeVertices,
             Camera3D.Position, Camera3D.ViewProjectionMatrix,
             TopLevelLists.edges, TopLevelLists.lines,
             processEdges, temporaryEdges, boolEdges
             );
-            Triangles.Clear();
             SetTriangles(
-            visibleSectors, TopLevelLists.meshes, ArrayOfRectangleArrays,
+            visibleSectors, TopLevelLists.meshes, ArrayOfRectangles,
             TopLevelLists.vertices, TopLevelLists.textures, TopLevelLists.normals,
             TopLevelLists.indices, Camera3D.Position,
             processbool, processvertices, temporaryvertices,
             processtextures, temporarytextures,
             processnormals, temporarynormals,
-            Triangles, Camera3D.ViewProjectionMatrix, Width, Height, ArrayOfInts, tiles, tilesX, tilesY, frameAlternate, texWidth, texHeight, tileSizeX, tileSizeY, lightDir
+            Triangles, Camera3D.ViewProjectionMatrix, Width, Height, ArrayOfTileTriangles, tiles, tilesX, tilesY, frameAlternate, texWidth, texHeight, tileSizeX, tileSizeY, lightDir
             );
             Array.Fill(depthBuffer, float.PositiveInfinity);
             Array.Clear(backBuffer, 0, backBuffer.Length);
 
-            DrawTiles(tiles, ArrayOfInts, Triangles, Width, Height, texWidth, texHeight, maskX, maskY, sampleTexture, backBuffer, depthBuffer);
+            DrawTiles(tiles, ArrayOfTileTriangles, Triangles, Width, Height, texWidth, texHeight, maskX, maskY, sampleTexture, backBuffer, depthBuffer);
             
             ReadOnlySpan<byte> pixelBytes = MemoryMarshal.AsBytes(backBuffer.AsSpan());
             SDL.UpdateTexture(streamingTexture, IntPtr.Zero, pixelBytes, Width * sizeof(uint));
