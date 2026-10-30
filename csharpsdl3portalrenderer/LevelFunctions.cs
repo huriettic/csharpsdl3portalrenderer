@@ -15,6 +15,7 @@ public struct Triangle
     public float invvx, invvy;
     public float diffuse;
     public float invArea;
+    public int texture;
 };
 
 [Serializable]
@@ -148,7 +149,7 @@ public static class LevelFunctions
 
         float x = -MathF.Cos(pitchRad) * MathF.Sin(yawRad);
         float y = MathF.Sin(pitchRad);
-        float z = -MathF.Cos(pitchRad) * MathF.Cos(yawRad);
+        float z = MathF.Cos(pitchRad) * MathF.Cos(yawRad);
 
         return Vector3.Normalize(new Vector3(x, y, z));
     }
@@ -310,7 +311,7 @@ public static class LevelFunctions
         }
     }
 
-    public static void SetTriangles(int[] visibleSectors, List<MeshMeta> meshes, Vector4[] ArrayOfRectangles, List<Vector3> vertices, List<Vector2> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector2[] processtextures, Vector2[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, Triangle[] ArrayOfTriangles, Matrix4x4 CamViewProj, int Width, int Height, TileTriangle[] ArrayOfTileTriangles, Tile[] tiles, int tilesX, int tilesY, int frameAlternate, int texWidth, int texHeight, int tileSizeX, int tileSizeY, Vector3 lightDir)
+    public static void SetTriangles(int[] visibleSectors, List<MeshMeta> meshes, Vector4[] ArrayOfRectangles, List<Vector3> vertices, List<Vector3> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector3[] processtextures, Vector3[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, Triangle[] ArrayOfTriangles, Matrix4x4 CamViewProj, int Width, int Height, TileTriangle[] ArrayOfTileTriangles, Tile[] tiles, int tilesX, int tilesY, int frameAlternate, int texWidth, int texHeight, int tileSizeX, int tileSizeY, Vector3 lightDir)
     {
         for (int a = 0; a < visibleSectors.Length; a++)
         {
@@ -387,9 +388,9 @@ public static class LevelFunctions
                         Vector4 v1 = processvertices[d + 1];
                         Vector4 v2 = processvertices[d + 2];
 
-                        Vector2 uv0 = processtextures[d];
-                        Vector2 uv1 = processtextures[d + 1];
-                        Vector2 uv2 = processtextures[d + 2];
+                        Vector3 uv0 = processtextures[d];
+                        Vector3 uv1 = processtextures[d + 1];
+                        Vector3 uv2 = processtextures[d + 2];
 
                         Vector3 n0 = processnormals[d];
                         Vector3 n1 = processnormals[d + 1];
@@ -429,7 +430,7 @@ public static class LevelFunctions
                         else if ((b0 && !b1 && !b2) || (!b0 && b1 && !b2) || (!b0 && !b1 && b2))
                         {
                             Vector4 inV, outV1, outV2;
-                            Vector2 inUV, outUV1, outUV2;
+                            Vector3 inUV, outUV1, outUV2;
                             Vector3 inN, outN1, outN2;
                             float inD, outD1, outD2;
 
@@ -487,8 +488,8 @@ public static class LevelFunctions
                             temporaryvertices[temporaryverticescount + 2] = Vector4.Lerp(inV, outV2, t2);
                             temporaryverticescount += 3;
                             temporarytextures[temporarytexturescount] = inUV;
-                            temporarytextures[temporarytexturescount + 1] = Vector2.Lerp(inUV, outUV1, t1);
-                            temporarytextures[temporarytexturescount + 2] = Vector2.Lerp(inUV, outUV2, t2);
+                            temporarytextures[temporarytexturescount + 1] = Vector3.Lerp(inUV, outUV1, t1);
+                            temporarytextures[temporarytexturescount + 2] = Vector3.Lerp(inUV, outUV2, t2);
                             temporarytexturescount += 3;
                             temporarynormals[temporarynormalscount] = inN;
                             temporarynormals[temporarynormalscount + 1] = Vector3.Normalize(Vector3.Lerp(inN, outN1, t1));
@@ -503,7 +504,7 @@ public static class LevelFunctions
                         else if ((!b0 && b1 && b2) || (b0 && !b1 && b2) || (b0 && b1 && !b2))
                         {
                             Vector4 inV1, inV2, outV;
-                            Vector2 inUV1, inUV2, outUV;
+                            Vector3 inUV1, inUV2, outUV;
                             Vector3 inN1, inN2, outN;
                             float inD1, inD2, outD;
 
@@ -559,8 +560,8 @@ public static class LevelFunctions
                             Vector4 vA = Vector4.Lerp(inV1, outV, t1);
                             Vector4 vB = Vector4.Lerp(inV2, outV, t2);
 
-                            Vector2 uvA = Vector2.Lerp(inUV1, outUV, t1);
-                            Vector2 uvB = Vector2.Lerp(inUV2, outUV, t2);
+                            Vector3 uvA = Vector3.Lerp(inUV1, outUV, t1);
+                            Vector3 uvB = Vector3.Lerp(inUV2, outUV, t2);
 
                             Vector3 nA = Vector3.Normalize(Vector3.Lerp(inN1, outN, t1));
                             Vector3 nB = Vector3.Normalize(Vector3.Lerp(inN2, outN, t2));
@@ -719,6 +720,8 @@ public static class LevelFunctions
                         rawDiffuse = MathF.Min(1.0f, (rawDiffuse * rawDiffuse) + 0.2f);
 
                         tri.diffuse = Math.Clamp(rawDiffuse, 0.0f, 1.0f);
+
+                        tri.texture = (int)processtextures[f].Z;
 
                         ArrayOfTriangles[(a * 128) + triangles] = tri;
                         triangles += 1;
@@ -1254,7 +1257,7 @@ public static class LevelFunctions
         return new Vector3(vertex.X * invw, vertex.Y * invw, vertex.Z * invw);
     }
 
-    public static void BuildGeometry(List<Sector> sectors, List<Vector2> vertices, double Ceiling, double Floor, List<Vector3> temporaryVertices, List<Vector2> temporaryTextures, List<Vector3> temporaryNormals, List<int> temporaryTriangles, MathematicalPlane LeftPlane, MathematicalPlane TopPlane, List<MathematicalPlane> planes, List<Vector3> edges, List<int> lines, List<PortalMeta> portals, List<Vector3> ceilingVertices, List<Vector2> ceilingTextures, List<int> ceilingTriangles, List<Vector3> floorVertices, List<Vector2> floorTextures, List<int> floorTriangles, List<MeshMeta> meshes, List<ColliderMeta> collision, List<Vector3> Vertices, List<Vector2> Textures, List<Vector3> Normals, List<int> Indices, List<SectorMeta> Sectors)
+    public static void BuildGeometry(List<Sector> sectors, List<Vector2> vertices, double Ceiling, double Floor, List<Vector3> temporaryVertices, List<Vector3> temporaryTextures, List<Vector3> temporaryNormals, List<int> temporaryTriangles, MathematicalPlane LeftPlane, MathematicalPlane TopPlane, List<MathematicalPlane> planes, List<Vector3> edges, List<int> lines, List<PortalMeta> portals, List<Vector3> ceilingVertices, List<Vector3> ceilingTextures, List<int> ceilingTriangles, List<Vector3> floorVertices, List<Vector3> floorTextures, List<int> floorTriangles, List<MeshMeta> meshes, List<ColliderMeta> collision, List<Vector3> Vertices, List<Vector3> Textures, List<Vector3> Normals, List<int> Indices, List<SectorMeta> Sectors)
     {
         int portalStart = 0;
 
@@ -1334,10 +1337,10 @@ public static class LevelFunctions
                     LeftPlane = new MathematicalPlane { normal = leftPlaneNormal, distance = leftPlaneDistance };
                     TopPlane = new MathematicalPlane { normal = topPlaneNormal, distance = topPlaneDistance };
 
-                    temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert]) / 2.5f));
-                    temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 1]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 1]) / 2.5f));
-                    temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 2]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 2]) / 2.5f));
-                    temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 3]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 3]) / 2.5f));
+                    temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert]) / 2.5f, 0));
+                    temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 1]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 1]) / 2.5f, 0));
+                    temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 2]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 2]) / 2.5f, 0));
+                    temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 3]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 3]) / 2.5f, 0));
 
                     temporaryNormals.Add(n);
                     temporaryNormals.Add(n);
@@ -1400,10 +1403,10 @@ public static class LevelFunctions
                             LeftPlane = new MathematicalPlane { normal = leftPlaneNormal, distance = leftPlaneDistance };
                             TopPlane = new MathematicalPlane { normal = topPlaneNormal, distance = topPlaneDistance };
 
-                            temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert]) / 2.5f));
-                            temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 1]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 1]) / 2.5f));
-                            temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 2]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 2]) / 2.5f));
-                            temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 3]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 3]) / 2.5f));
+                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert]) / 2.5f, 0));
+                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 1]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 1]) / 2.5f, 0));
+                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 2]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 2]) / 2.5f, 0));
+                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 3]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 3]) / 2.5f, 0));
 
                             temporaryNormals.Add(n);
                             temporaryNormals.Add(n);
@@ -1454,10 +1457,10 @@ public static class LevelFunctions
                             LeftPlane = new MathematicalPlane { normal = leftPlaneNormal, distance = leftPlaneDistance };
                             TopPlane = new MathematicalPlane { normal = topPlaneNormal, distance = topPlaneDistance };
 
-                            temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert]) / 2.5f));
-                            temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 1]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 1]) / 2.5f));
-                            temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 2]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 2]) / 2.5f));
-                            temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 3]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 3]) / 2.5f));
+                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert]) / 2.5f, 0));
+                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 1]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 1]) / 2.5f, 0));
+                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 2]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 2]) / 2.5f, 0));
+                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 3]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 3]) / 2.5f, 0));
 
                             temporaryNormals.Add(n);
                             temporaryNormals.Add(n);
@@ -1594,10 +1597,10 @@ public static class LevelFunctions
                             LeftPlane = new MathematicalPlane { normal = leftPlaneNormal, distance = leftPlaneDistance };
                             TopPlane = new MathematicalPlane { normal = topPlaneNormal, distance = topPlaneDistance };
 
-                            temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert]) / 2.5f));
-                            temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 1]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 1]) / 2.5f));
-                            temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 2]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 2]) / 2.5f));
-                            temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 3]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 3]) / 2.5f));
+                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert]) / 2.5f, 3));
+                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 1]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 1]) / 2.5f, 3));
+                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 2]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 2]) / 2.5f, 3));
+                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 3]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 3]) / 2.5f, 3));
 
                             temporaryNormals.Add(n);
                             temporaryNormals.Add(n);
@@ -1648,10 +1651,10 @@ public static class LevelFunctions
                             LeftPlane = new MathematicalPlane { normal = leftPlaneNormal, distance = leftPlaneDistance };
                             TopPlane = new MathematicalPlane { normal = topPlaneNormal, distance = topPlaneDistance };
 
-                            temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert]) / 2.5f));
-                            temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 1]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 1]) / 2.5f));
-                            temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 2]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 2]) / 2.5f));
-                            temporaryTextures.Add(new Vector2(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 3]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 3]) / 2.5f));
+                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert]) / 2.5f, 3));
+                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 1]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 1]) / 2.5f, 3));
+                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 2]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 2]) / 2.5f, 3));
+                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 3]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 3]) / 2.5f, 3));
 
                             temporaryNormals.Add(n);
                             temporaryNormals.Add(n);
@@ -1693,8 +1696,8 @@ public static class LevelFunctions
 
                     floorVertices.Add(new Vector3((float)Z, (float)YF, (float)X));
                     ceilingVertices.Add(new Vector3((float)Z, (float)YC, (float)X));
-                    floorTextures.Add(new Vector2(OY, OX));
-                    ceilingTextures.Add(new Vector2(OY, OX));
+                    floorTextures.Add(new Vector3(OY, OX, 1));
+                    ceilingTextures.Add(new Vector3(OY, OX, 2));
                 }
 
                 floorVertices.Reverse();
@@ -2089,7 +2092,7 @@ public static class LevelFunctions
         return new Vector4(xmin, ymin, xmax, ymax);
     }
 
-    public static void DrawTiles(Tile[] tiles, TileTriangle[] ArrayOfTileTriangles, Triangle[] ArrayOfTriangles, int Width, int Height, int texWidth, int texHeight, int maskX, int maskY, uint[] sampleTexture, uint[] backBuffer, float[] depthBuffer)
+    public static void DrawTiles(Tile[] tiles, TileTriangle[] ArrayOfTileTriangles, Triangle[] ArrayOfTriangles, int Width, int Height, int texWidth, int texHeight, int maskX, int maskY, uint[][] sampleTexture, uint[] backBuffer, float[] depthBuffer)
     {
         int totalTiles = tiles.Length;
         for (int t = 0; t < totalTiles; t++)
@@ -2167,7 +2170,7 @@ public static class LevelFunctions
                                 int tx = ((int)texX - (texX < 0 ? 1 : 0)) & maskX;
                                 int ty = ((int)texY - (texY < 0 ? 1 : 0)) & maskY;
 
-                                uint col = sampleTexture[ty * texWidth + tx];
+                                uint col = sampleTexture[tri.texture][ty * texWidth + tx];
 
                                 byte r = (byte)(((col >> 0) & 255) * diffuse);
                                 byte g = (byte)(((col >> 8) & 255) * diffuse);

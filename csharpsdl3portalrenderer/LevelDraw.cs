@@ -18,10 +18,10 @@ public static class LevelDraw
     static uint[] backBuffer = new uint[Width * Height];
     static nint streamingTexture = 0;
 
-    static int texWidth;
-    static int texHeight;
-    static int maskX;
-    static int maskY;
+    static int texWidth = 128;
+    static int texHeight = 128;
+    static int maskX = texWidth - 1;
+    static int maskY = texHeight - 1;
 
     static List<Vector2> vertices = new();
     static List<Sector> sectors = new();
@@ -35,15 +35,15 @@ public static class LevelDraw
 
     static List<Vector3> temporaryVertices = new();
     static List<Vector3> temporaryNormals = new();
-    static List<Vector2> temporaryTextures = new();
+    static List<Vector3> temporaryTextures = new();
     static List<int> temporaryTriangles = new();
 
     static List<Vector3> ceilingVertices = new();
     static List<int> ceilingTriangles = new();
     static List<Vector3> floorVertices = new();
     static List<int> floorTriangles = new();
-    static List<Vector2> floorTextures = new();
-    static List<Vector2> ceilingTextures = new();
+    static List<Vector3> floorTextures = new();
+    static List<Vector3> ceilingTextures = new();
 
     static List<Vector3> OutEdgeVertices = new();
     static Triangle[] Triangles = Array.Empty<Triangle>();
@@ -54,10 +54,10 @@ public static class LevelDraw
 
     static bool[] processbool = new bool[256];
     static Vector4[] processvertices = new Vector4[256];
-    static Vector2[] processtextures = new Vector2[256];
+    static Vector3[] processtextures = new Vector3[256];
     static Vector3[] processnormals = new Vector3[256];
     static Vector4[] temporaryvertices = new Vector4[256];
-    static Vector2[] temporarytextures = new Vector2[256];
+    static Vector3[] temporarytextures = new Vector3[256];
     static Vector3[] temporarynormals = new Vector3[256];
 
     static List<SectorMeta> Sectors = new();
@@ -68,6 +68,7 @@ public static class LevelDraw
     static int[] visibleSectors = Array.Empty<int>();
     static int[] contactingSectors = Array.Empty<int>();
     static int frameAlternate = 0;
+    static uint[][] textures = Array.Empty<uint[]>();
 
     static Random rng = new();
 
@@ -83,7 +84,7 @@ public static class LevelDraw
         public static List<Vector3> edges = new();
         public static List<int> lines = new();
         public static List<Vector3> vertices = new();
-        public static List<Vector2> textures = new();
+        public static List<Vector3> textures = new();
         public static List<Vector3> normals = new();
         public static List<int> indices = new();
         public static List<MeshMeta> meshes = new();
@@ -292,6 +293,12 @@ public static class LevelDraw
         ArrayOfRectangles = new Vector4[TopLevelLists.sectors.Count * 32];
         visibleSectors = VisibleSectorsMake(TopLevelLists.sectors);
         contactingSectors = contactSectorsMake(TopLevelLists.sectors);
+        textures = new uint[4][];
+
+        for ( int i = 0; i < textures.Length; i++)
+        {
+            textures[i] = new uint[texWidth * texHeight];
+        }
 
         contactingSectors[CurrentSector.sectorId] = 1;
 
@@ -319,15 +326,22 @@ public static class LevelDraw
         streamingTexture = SDL.CreateTexture(renderer, SDL.PixelFormat.ABGR8888, SDL.TextureAccess.Streaming, Width, Height);
         SDL.SetRenderVSync(renderer, 1);
         SDL.SetWindowRelativeMouseMode(window, true);
-        nint texture = SDL.LoadPNG("assets/texture.png");
-        SDL.Surface tex = Marshal.PtrToStructure<SDL.Surface>(texture);
-        texWidth = tex.Width;
-        texHeight = tex.Height;
-        maskX = texWidth - 1;
-        maskY = texHeight - 1;
-        uint[] sampleTexture = new uint[texWidth * texHeight];
-        Marshal.Copy(tex.Pixels, (int[])(object)sampleTexture, 0, sampleTexture.Length);
-        SDL.DestroySurface(texture);
+        nint white = SDL.LoadPNG("assets/White.png");
+        nint green = SDL.LoadPNG("assets/Green.png");
+        nint grey = SDL.LoadPNG("assets/Grey.png");
+        nint red = SDL.LoadPNG("assets/Red.png");
+        SDL.Surface whitetex = Marshal.PtrToStructure<SDL.Surface>(white);
+        SDL.Surface greentex = Marshal.PtrToStructure<SDL.Surface>(green);
+        SDL.Surface greytex = Marshal.PtrToStructure<SDL.Surface>(grey);
+        SDL.Surface redtex = Marshal.PtrToStructure<SDL.Surface>(red);
+        Marshal.Copy(whitetex.Pixels, (int[])(object)textures[0], 0, textures[0].Length);
+        Marshal.Copy(greentex.Pixels, (int[])(object)textures[1], 0, textures[1].Length);
+        Marshal.Copy(greytex.Pixels, (int[])(object)textures[2], 0, textures[2].Length);
+        Marshal.Copy(redtex.Pixels, (int[])(object)textures[3], 0, textures[3].Length);
+        SDL.DestroySurface(white);
+        SDL.DestroySurface(green);
+        SDL.DestroySurface(grey);
+        SDL.DestroySurface(red);
         float sunPitch = 50.0f;
         float sunYaw = -30.0f;
         Vector3 lightDir = CalculateSunDirection(sunPitch, sunYaw);
@@ -376,7 +390,7 @@ public static class LevelDraw
             Array.Fill(depthBuffer, float.PositiveInfinity);
             Array.Clear(backBuffer, 0, backBuffer.Length);
 
-            DrawTiles(tiles, ArrayOfTileTriangles, Triangles, Width, Height, texWidth, texHeight, maskX, maskY, sampleTexture, backBuffer, depthBuffer);
+            DrawTiles(tiles, ArrayOfTileTriangles, Triangles, Width, Height, texWidth, texHeight, maskX, maskY, textures, backBuffer, depthBuffer);
             
             ReadOnlySpan<byte> pixelBytes = MemoryMarshal.AsBytes(backBuffer.AsSpan());
             SDL.UpdateTexture(streamingTexture, IntPtr.Zero, pixelBytes, Width * sizeof(uint));
