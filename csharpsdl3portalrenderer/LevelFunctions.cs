@@ -2204,4 +2204,117 @@ public static class LevelFunctions
             }
         }
     }
+
+    public static void DrawTilesParallel(Tile[] tiles, TileTriangle[] ArrayOfTileTriangles, Triangle[] ArrayOfTriangles, int Width, int Height, int texWidth, int texHeight, int maskX, int maskY, uint[][] sampleTexture, uint[] backBuffer, float[] depthBuffer)
+    {
+        int totalTiles = tiles.Length;
+        Parallel.For(0, totalTiles, t =>
+        {
+            Tile tile = tiles[t];
+            if (tile.triangleCount == 0)
+            {
+                return;
+            }
+
+            int startOffset = t * 128;
+
+            for (int bt = 0; bt < tile.triangleCount; bt++)
+            {
+                var tt = ArrayOfTileTriangles[startOffset + bt];
+
+                int triId = tt.triangleIndex;
+                Triangle tri = ArrayOfTriangles[triId];
+
+                int startY = tt.miny;
+                int endY = tt.maxy;
+                int startX = tt.minx;
+                int endX = tt.maxx;
+
+                if (startX >= endX || startY >= endY)
+                {
+                    continue;
+                }
+
+                float startPx = startX + 0.5f;
+                float startPy = startY + 0.5f;
+
+                float edgeRow0 = tri.edgeA0 * startPx + tri.edgeB0 * startPy + tri.edgeC0;
+                float edgeRow1 = tri.edgeA1 * startPx + tri.edgeB1 * startPy + tri.edgeC1;
+                float edgeRow2 = tri.edgeA2 * startPx + tri.edgeB2 * startPy + tri.edgeC2;
+
+                float startW0 = edgeRow0 * tri.invArea;
+                float startW1 = edgeRow1 * tri.invArea;
+                float startW2 = edgeRow2 * tri.invArea;
+
+                float rowW = startW0 * tri.invw0 + startW1 * tri.invw1 + startW2 * tri.invw2;
+                float rowZ = startW0 * tri.invz0 + startW1 * tri.invz1 + startW2 * tri.invz2;
+                float rowU = startW0 * tri.invuv0.X + startW1 * tri.invuv1.X + startW2 * tri.invuv2.X;
+                float rowV = startW0 * tri.invuv0.Y + startW1 * tri.invuv1.Y + startW2 * tri.invuv2.Y;
+
+                float diffuse = tri.diffuse;
+
+                for (int y = startY; y < endY; y++)
+                {
+                    int p = y * Width + startX;
+
+                    float edge0 = edgeRow0;
+                    float edge1 = edgeRow1;
+                    float edge2 = edgeRow2;
+
+                    float incW = rowW;
+                    float incZ = rowZ;
+                    float incU = rowU;
+                    float incV = rowV;
+
+                    for (int x = startX; x < endX; x++)
+                    {
+                        if (edge0 <= 0f && edge1 <= 0f && edge2 <= 0f)
+                        {
+                            float invWeight = 1.0f / incW;
+                            float z = incZ * invWeight;
+
+                            if (z < depthBuffer[p])
+                            {
+                                depthBuffer[p] = z;
+
+                                float texX = incU * invWeight;
+                                float texY = incV * invWeight;
+
+                                int tx = ((int)texX - (texX < 0 ? 1 : 0)) & maskX;
+                                int ty = ((int)texY - (texY < 0 ? 1 : 0)) & maskY;
+
+                                uint col = sampleTexture[tri.texture][ty * texWidth + tx];
+
+                                byte r = (byte)(((col >> 0) & 255) * diffuse);
+                                byte g = (byte)(((col >> 8) & 255) * diffuse);
+                                byte b = (byte)(((col >> 16) & 255) * diffuse);
+                                byte a = (byte)((col >> 24) & 255);
+
+                                backBuffer[p] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
+                            }
+                        }
+
+                        edge0 += tri.edgeA0;
+                        edge1 += tri.edgeA1;
+                        edge2 += tri.edgeA2;
+
+                        incW += tri.invwx;
+                        incZ += tri.invzx;
+                        incU += tri.invux;
+                        incV += tri.invvx;
+                        p += 1;
+                    }
+
+                    edgeRow0 += tri.edgeB0;
+                    edgeRow1 += tri.edgeB1;
+                    edgeRow2 += tri.edgeB2;
+
+                    rowW += tri.invwy;
+                    rowZ += tri.invzy;
+                    rowU += tri.invuy;
+                    rowV += tri.invvy;
+                }
+            }
+        });
+    }
 }

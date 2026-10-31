@@ -390,7 +390,7 @@ public static class LevelDraw
             Array.Fill(depthBuffer, float.PositiveInfinity);
             Array.Clear(backBuffer, 0, backBuffer.Length);
 
-            DrawTiles(tiles, ArrayOfTileTriangles, Triangles, Width, Height, texWidth, texHeight, maskX, maskY, textures, backBuffer, depthBuffer);
+            DrawTilesParallel(tiles, ArrayOfTileTriangles, Triangles, Width, Height, texWidth, texHeight, maskX, maskY, textures, backBuffer, depthBuffer);
             
             ReadOnlySpan<byte> pixelBytes = MemoryMarshal.AsBytes(backBuffer.AsSpan());
             SDL.UpdateTexture(streamingTexture, IntPtr.Zero, pixelBytes, Width * sizeof(uint));
