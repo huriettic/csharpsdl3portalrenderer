@@ -33,9 +33,7 @@ public static class LevelDraw
     static bool check;
     static float planeDistance;
 
-    static List<Vector3> temporaryVertices = new();
-    static List<Vector3> temporaryNormals = new();
-    static List<Vector3> temporaryTextures = new();
+    static List<Vertex> temporaryVertices = new();
     static List<int> temporaryTriangles = new();
 
     static List<Vector3> ceilingVertices = new();
@@ -47,27 +45,18 @@ public static class LevelDraw
 
     static List<Vector3> OutEdgeVertices = new();
     static Triangle[] Triangles = Array.Empty<Triangle>();
-
-    static bool[] boolEdges = new bool[128];
-    static Vector4[] processEdges = new Vector4[128];
-    static Vector4[] temporaryEdges = new Vector4[128];
-
-    static bool[] processbool = new bool[256];
-    static Vector4[] processvertices = new Vector4[256];
-    static Vector3[] processtextures = new Vector3[256];
-    static Vector3[] processnormals = new Vector3[256];
-    static Vector4[] temporaryvertices = new Vector4[256];
-    static Vector3[] temporarytextures = new Vector3[256];
-    static Vector3[] temporarynormals = new Vector3[256];
+    static EdgeVertex[] processEdges = new EdgeVertex[128];
+    static EdgeVertex[] temporaryEdges = new EdgeVertex[128];
+    static ClipVertex[] processPipeline = new ClipVertex[256];
+    static ClipVertex[] temporaryPipeline = new ClipVertex[256];
 
     static List<SectorMeta> Sectors = new();
     static List<List<SectorMeta>> ListOfSectorLists = new();
     static TileTriangle[] ArrayOfTileTriangles = Array.Empty<TileTriangle>();
-    static Tile[] tiles = new Tile[tilesX * tilesY];
+    static int[] triangleCount = new int[tilesX * tilesY];
     static Vector4[] ArrayOfRectangles = Array.Empty<Vector4>();
     static int[] visibleSectors = Array.Empty<int>();
     static int[] contactingSectors = Array.Empty<int>();
-    static int frameAlternate = 0;
     static uint[][] textures = Array.Empty<uint[]>();
 
     static Random rng = new();
@@ -83,14 +72,11 @@ public static class LevelDraw
     {
         public static List<Vector3> edges = new();
         public static List<int> lines = new();
-        public static List<Vector3> vertices = new();
-        public static List<Vector3> textures = new();
-        public static List<Vector3> normals = new();
+        public static List<Vertex> vertices = new();
         public static List<int> indices = new();
         public static List<MeshMeta> meshes = new();
         public static List<MathematicalPlane> planes = new();
         public static List<PortalMeta> portals = new();
-        public static List<ColliderMeta> collision = new();
         public static List<SectorMeta> sectors = new();
         public static List<StartPosition> positions = new();
     }
@@ -171,7 +157,7 @@ public static class LevelDraw
             }
         }
 
-        public static void SetCollision(int[] contactingSectors, List<ColliderMeta> collision, List<Vector3> vertices, List<int> triangles)
+        public static void SetCollision(int[] contactingSectors, List<MeshMeta> collision, List<Vertex> vertices, List<int> triangles)
         {
             float Radius = 1.25f;
             Vector3 pos = Position;
@@ -183,13 +169,13 @@ public static class LevelDraw
                     continue;
                 }
 
-                ColliderMeta collide = collision[a];
+                MeshMeta collide = collision[a];
 
                 for (int t = collide.indicesStartIndex; t < collide.indicesStartIndex + collide.indicesCount; t += 3)
                 {
-                    Vector3 A = vertices[triangles[t]];
-                    Vector3 B = vertices[triangles[t + 1]];
-                    Vector3 C = vertices[triangles[t + 2]];
+                    Vector3 A = vertices[triangles[t]].v;
+                    Vector3 B = vertices[triangles[t + 1]].v;
+                    Vector3 C = vertices[triangles[t + 2]].v;
 
                     Vector3 closest = Vector3.Zero;
                     Vector3 diff = Vector3.Zero;
@@ -273,23 +259,21 @@ public static class LevelDraw
 
         BuildGeometry(
             sectors, vertices, Ceiling, Floor,
-            temporaryVertices, temporaryTextures, temporaryNormals, temporaryTriangles,
+            temporaryVertices, temporaryTriangles,
             LeftPlane, TopPlane,
             TopLevelLists.planes, TopLevelLists.edges, TopLevelLists.lines, TopLevelLists.portals,
             ceilingVertices, ceilingTextures, ceilingTriangles,
             floorVertices, floorTextures, floorTriangles,
-            TopLevelLists.meshes, TopLevelLists.collision,
-            TopLevelLists.vertices, TopLevelLists.textures,
-            TopLevelLists.normals, TopLevelLists.indices,
+            TopLevelLists.meshes,
+            TopLevelLists.vertices,
+            TopLevelLists.indices,
             TopLevelLists.sectors
         );
 
         CurrentSector = PlayerStart(TopLevelLists.positions, TopLevelLists.sectors, rng, ref playerStartPosition);
 
-        InitializeTiles(tilesX, tilesY, tileSizeX, tileSizeY, tiles);
-
         ListOfSectorLists = MakeLists();
-        ArrayOfTileTriangles = new TileTriangle[tiles.Length * 128];
+        ArrayOfTileTriangles = new TileTriangle[(tilesX * tilesY) * 128];
         Triangles = new Triangle[TopLevelLists.sectors.Count * 128];
         ArrayOfRectangles = new Vector4[TopLevelLists.sectors.Count * 32];
         visibleSectors = VisibleSectorsMake(TopLevelLists.sectors);
@@ -358,7 +342,7 @@ public static class LevelDraw
             }
             float dt = GetDeltaTime();
             SDLPlayerController.HandleMovement(dt);
-            SDLPlayerController.SetCollision(contactingSectors, TopLevelLists.collision, TopLevelLists.vertices, TopLevelLists.indices);
+            SDLPlayerController.SetCollision(contactingSectors, TopLevelLists.meshes, TopLevelLists.vertices, TopLevelLists.indices);
             SDLPlayerController.UpdateCamera();
             if (SDLPlayerController.QuitRequested)
             {
@@ -377,29 +361,25 @@ public static class LevelDraw
             TopLevelLists.sectors, Sectors, OutEdgeVertices,
             Camera3D.Position, Camera3D.ViewProjectionMatrix,
             TopLevelLists.edges, TopLevelLists.lines,
-            processEdges, temporaryEdges, boolEdges
+            processEdges, temporaryEdges
             );
+            Array.Fill(triangleCount, 0);
             SetTriangles(
-            visibleSectors, TopLevelLists.meshes, ArrayOfRectangles,
-            TopLevelLists.vertices, TopLevelLists.textures, TopLevelLists.normals,
+            visibleSectors, TopLevelLists.meshes, processPipeline, temporaryPipeline, ArrayOfRectangles,
+            TopLevelLists.vertices,
             TopLevelLists.indices, Camera3D.Position,
-            processbool, processvertices, temporaryvertices,
-            processtextures, temporarytextures,
-            processnormals, temporarynormals,
-            Triangles, Camera3D.ViewProjectionMatrix, Width, Height, ArrayOfTileTriangles, tiles, tilesX, tilesY, frameAlternate, texWidth, texHeight, tileSizeX, tileSizeY, lightDir
+            Triangles, Camera3D.ViewProjectionMatrix, Width, Height, ArrayOfTileTriangles, tilesX, tilesY, texWidth, texHeight, tileSizeX, tileSizeY, lightDir, triangleCount
             );
             Array.Fill(depthBuffer, float.PositiveInfinity);
             Array.Clear(backBuffer, 0, backBuffer.Length);
 
-            DrawTilesParallel(tiles, ArrayOfTileTriangles, Triangles, Width, Height, texWidth, texHeight, maskX, maskY, textures, backBuffer, depthBuffer);
+            DrawTilesParallel(tilesX, tilesY, triangleCount, ArrayOfTileTriangles, Triangles, Width, Height, texWidth, texHeight, maskX, maskY, textures, backBuffer, depthBuffer);
             
             ReadOnlySpan<byte> pixelBytes = MemoryMarshal.AsBytes(backBuffer.AsSpan());
             SDL.UpdateTexture(streamingTexture, IntPtr.Zero, pixelBytes, Width * sizeof(uint));
             SDL.RenderClear(renderer);
             SDL.RenderTexture(renderer, streamingTexture, IntPtr.Zero, IntPtr.Zero);
             SDL.RenderPresent(renderer);
-
-            frameAlternate = 1 - frameAlternate;
         }
         SDL.DestroyTexture(streamingTexture);
         SDL.DestroyRenderer(renderer);

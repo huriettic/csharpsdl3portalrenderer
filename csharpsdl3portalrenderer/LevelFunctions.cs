@@ -75,43 +75,42 @@ public struct SectorMeta
     public int sectorId;
 };
 
+public struct EdgeVertex
+{
+    public Vector4 c;
+    public bool b;
+};
+
+[Serializable]
+public struct ClipVertex
+{
+    public Vector4 c;
+    public Vector3 t;
+    public Vector3 n;
+    public bool b;
+};
+
+[Serializable]
+public struct Vertex
+{
+    public Vector3 v;
+    public Vector3 t;
+    public Vector3 n;
+};
+
 [Serializable]
 public struct MeshMeta
 {
     public int verticesStartIndex;
     public int verticesCount;
 
-    public int texturesStartIndex;
-    public int texturesCount;
-
-    public int normalsStartIndex;
-    public int normalsCount;
-
     public int indicesStartIndex;
     public int indicesCount;
+
+    public int triangles;
 };
 
 [Serializable]
-public struct ColliderMeta
-{
-    public int verticesStartIndex;
-    public int verticesCount;
-
-    public int indicesStartIndex;
-    public int indicesCount;
-};
-
-public struct Tile
-{
-    public int frameFlag;
-    public int triangleCount;
-    public int minx;
-    public int miny;
-    public int maxx;
-    public int maxy;
-};
-
-
 public struct TileTriangle
 {
     public int triangleIndex;
@@ -119,29 +118,10 @@ public struct TileTriangle
     public int miny;
     public int maxx;
     public int maxy;
-}
+};
 
 public static class LevelFunctions
 {
-    public static void InitializeTiles(int tilesX, int tilesY, int tileSizeX, int tileSizeY, Tile[] tiles)
-    {
-        for (int y = 0; y < tilesY; y++)
-        {
-            for (int x = 0; x < tilesX; x++)
-            {
-                int index = y * tilesX + x;
-
-                tiles[index] = new Tile
-                {
-                    minx = x * tileSizeX,
-                    miny = y * tileSizeY,
-                    maxx = (x + 1) * tileSizeX,
-                    maxy = (y + 1) * tileSizeY
-                };
-            }
-        }
-    }
-
     public static Vector3 CalculateSunDirection(float pitchDegrees, float yawDegrees)
     {
         float pitchRad = pitchDegrees * MathF.PI / 180.0f;
@@ -180,7 +160,7 @@ public static class LevelFunctions
         return visibleSectors;
     }
 
-    public static void GetPortals(SectorMeta ASector, List<List<SectorMeta>> ListOfSectorLists, Vector4[] ArrayOfRectangles, int[] visibleSectors, List<PortalMeta> portals, float planeDistance, List<MathematicalPlane> planes, List<SectorMeta> sectors, List<SectorMeta> contact, List<Vector3> OutEdgeVertices, Vector3 CamPosition, Matrix4x4 CamViewProj, List<Vector3> edges, List<int> lines, Vector4[] processEdges, Vector4[] temporaryEdges, bool[] boolEdges)
+    public static void GetPortals(SectorMeta ASector, List<List<SectorMeta>> ListOfSectorLists, Vector4[] ArrayOfRectangles, int[] visibleSectors, List<PortalMeta> portals, float planeDistance, List<MathematicalPlane> planes, List<SectorMeta> sectors, List<SectorMeta> contact, List<Vector3> OutEdgeVertices, Vector3 CamPosition, Matrix4x4 CamViewProj, List<Vector3> edges, List<int> lines, EdgeVertex[] processBuffer, EdgeVertex[] temporaryBuffer)
     {
         int input = 0;
         int output = 1;
@@ -265,7 +245,7 @@ public static class LevelFunctions
                         continue;
                     }
 
-                    Vector4 rectangleOut = MakeRectangleWithEdges(rectangleIn, polygon, OutEdgeVertices, CamViewProj, edges, lines, processEdges, temporaryEdges, boolEdges);
+                    Vector4 rectangleOut = MakeRectangleWithEdges(rectangleIn, polygon, OutEdgeVertices, CamViewProj, edges, lines, processBuffer, temporaryBuffer);
 
                     if (OutEdgeVertices.Count < 6 || OutEdgeVertices.Count % 2 == 1)
                     {
@@ -311,12 +291,11 @@ public static class LevelFunctions
         }
     }
 
-    public static void SetTriangles(int[] visibleSectors, List<MeshMeta> meshes, Vector4[] ArrayOfRectangles, List<Vector3> vertices, List<Vector3> textures, List<Vector3> normals, List<int> indices, Vector3 CamPosition, bool[] processbool, Vector4[] processvertices, Vector4[] temporaryvertices, Vector3[] processtextures, Vector3[] temporarytextures, Vector3[] processnormals, Vector3[] temporarynormals, Triangle[] ArrayOfTriangles, Matrix4x4 CamViewProj, int Width, int Height, TileTriangle[] ArrayOfTileTriangles, Tile[] tiles, int tilesX, int tilesY, int frameAlternate, int texWidth, int texHeight, int tileSizeX, int tileSizeY, Vector3 lightDir)
+    public static void SetTriangles(int[] visibleSectors, List<MeshMeta> meshes, ClipVertex[] processPipeline, ClipVertex[] temporaryPipeline, Vector4[] ArrayOfRectangles, List<Vertex> vertices, List<int> indices, Vector3 CamPosition, Triangle[] ArrayOfTriangles, Matrix4x4 CamViewProj, int Width, int Height, TileTriangle[] ArrayOfTileTriangles, int tilesX, int tilesY, int texWidth, int texHeight, int tileSizeX, int tileSizeY, Vector3 lightDir, int[] triangleCount)
     {
         for (int a = 0; a < visibleSectors.Length; a++)
         {
             int triangles = 0;
-
             int count = visibleSectors[a];
 
             if (count == 0)
@@ -328,14 +307,14 @@ public static class LevelFunctions
 
             for (int b = mesh.indicesStartIndex; b < mesh.indicesStartIndex + mesh.indicesCount; b += 3)
             {
-                Vector3 world0 = vertices[indices[b]];
-                Vector3 world1 = vertices[indices[b + 1]];
-                Vector3 world2 = vertices[indices[b + 2]];
+                Vertex vert0 = vertices[indices[b]];
+                Vertex vert1 = vertices[indices[b + 1]];
+                Vertex vert2 = vertices[indices[b + 2]];
 
-                Vector3 edge1 = world1 - world0;
-                Vector3 edge2 = world2 - world0;
+                Vector3 edge1 = vert1.v - vert0.v;
+                Vector3 edge2 = vert2.v - vert0.v;
                 Vector3 normal = Vector3.Normalize(Vector3.Cross(edge1, edge2));
-                Vector3 camDir = Vector3.Normalize(CamPosition - world0);
+                Vector3 camDir = Vector3.Normalize(CamPosition - vert0.v);
                 float triangleDir = Vector3.Dot(normal, camDir);
 
                 if (triangleDir < 0)
@@ -343,79 +322,42 @@ public static class LevelFunctions
                     continue;
                 }
 
-                Vector4 clip0 = ConvertWorldToClip(CamViewProj, world0);
-                Vector4 clip1 = ConvertWorldToClip(CamViewProj, world1);
-                Vector4 clip2 = ConvertWorldToClip(CamViewProj, world2);
-
-                int processverticescount = 0;
-                int processtexturescount = 0;
-                int processnormalscount = 0;
-                int processboolcount = 0;
-
-                processvertices[processverticescount] = clip0;
-                processvertices[processverticescount + 1] = clip1;
-                processvertices[processverticescount + 2] = clip2;
-                processverticescount += 3;
-                processtextures[processtexturescount] = textures[indices[b]];
-                processtextures[processtexturescount + 1] = textures[indices[b + 1]];
-                processtextures[processtexturescount + 2] = textures[indices[b + 2]];
-                processtexturescount += 3;
-                processnormals[processnormalscount] = normals[indices[b]];
-                processnormals[processnormalscount + 1] = normals[indices[b + 1]];
-                processnormals[processnormalscount + 2] = normals[indices[b + 2]];
-                processnormalscount += 3;
-                processbool[processboolcount] = true;
-                processbool[processboolcount + 1] = true;
-                processbool[processboolcount + 2] = true;
-                processboolcount += 3;
+                int processCount = 3;
+                processPipeline[0] = new ClipVertex { c = ConvertWorldToClip(CamViewProj, vert0.v), t = vert0.t, n = vert0.n, b = true };
+                processPipeline[1] = new ClipVertex { c = ConvertWorldToClip(CamViewProj, vert1.v), t = vert1.t, n = vert1.n, b = true };
+                processPipeline[2] = new ClipVertex { c = ConvertWorldToClip(CamViewProj, vert2.v), t = vert2.t, n = vert2.n, b = true };
 
                 for (int c = 0; c < 2; c++)
                 {
-                    int AddTriangles = 0;
+                    int temporaryCount = 0;
+                    int addedTriangles = 0;
 
-                    int temporaryverticescount = 0;
-                    int temporarytexturescount = 0;
-                    int temporarynormalscount = 0;
-
-                    for (int d = 0; d < processverticescount; d += 3)
+                    for (int d = 0; d < processCount; d += 3)
                     {
-                        if (processbool[d] == false && processbool[d + 1] == false && processbool[d + 2] == false)
+                        if (!processPipeline[d].b && !processPipeline[d + 1].b && !processPipeline[d + 2].b)
                         {
                             continue;
                         }
 
-                        Vector4 v0 = processvertices[d];
-                        Vector4 v1 = processvertices[d + 1];
-                        Vector4 v2 = processvertices[d + 2];
-
-                        Vector3 uv0 = processtextures[d];
-                        Vector3 uv1 = processtextures[d + 1];
-                        Vector3 uv2 = processtextures[d + 2];
-
-                        Vector3 n0 = processnormals[d];
-                        Vector3 n1 = processnormals[d + 1];
-                        Vector3 n2 = processnormals[d + 2];
+                        ClipVertex cv0 = processPipeline[d];
+                        ClipVertex cv1 = processPipeline[d + 1];
+                        ClipVertex cv2 = processPipeline[d + 2];
 
                         float d0, d1, d2;
-
                         switch (c)
                         {
-                            case 0: // Near
-                                d0 = v0.Z;
-                                d1 = v1.Z;
-                                d2 = v2.Z;
+                            case 0: // Near Plane Clipping
+                                d0 = cv0.c.Z;
+                                d1 = cv1.c.Z;
+                                d2 = cv2.c.Z;
                                 break;
-
-                            case 1: // Far
-                                d0 = v0.W - v0.Z;
-                                d1 = v1.W - v1.Z;
-                                d2 = v2.W - v2.Z;
+                            case 1: // Far Plane Clipping
+                                d0 = cv0.c.W - cv0.c.Z;
+                                d1 = cv1.c.W - cv1.c.Z;
+                                d2 = cv2.c.W - cv2.c.Z;
                                 break;
-
                             default:
-                                d0 = 0;
-                                d1 = 0;
-                                d2 = 0;
+                                d0 = 0; d1 = 0; d2 = 0;
                                 break;
                         }
 
@@ -429,208 +371,104 @@ public static class LevelFunctions
                         }
                         else if ((b0 && !b1 && !b2) || (!b0 && b1 && !b2) || (!b0 && !b1 && b2))
                         {
-                            Vector4 inV, outV1, outV2;
-                            Vector3 inUV, outUV1, outUV2;
-                            Vector3 inN, outN1, outN2;
+                            ClipVertex inV, outV1, outV2;
                             float inD, outD1, outD2;
 
-                            if (b0)
-                            {
-                                inV = v0;
-                                inUV = uv0;
-                                inN = n0;
-                                inD = d0;
-                                outV1 = v1;
-                                outUV1 = uv1;
-                                outN1 = n1;
-                                outD1 = d1;
-                                outV2 = v2;
-                                outUV2 = uv2;
-                                outN2 = n2;
-                                outD2 = d2;
-                            }
-                            else if (b1)
-                            {
-                                inV = v1;
-                                inUV = uv1;
-                                inN = n1;
-                                inD = d1;
-                                outV1 = v2;
-                                outUV1 = uv2;
-                                outN1 = n2;
-                                outD1 = d2;
-                                outV2 = v0;
-                                outUV2 = uv0;
-                                outN2 = n0;
-                                outD2 = d0;
-                            }
-                            else
-                            {
-                                inV = v2;
-                                inUV = uv2;
-                                inN = n2;
-                                inD = d2;
-                                outV1 = v0;
-                                outUV1 = uv0;
-                                outN1 = n0;
-                                outD1 = d0;
-                                outV2 = v1;
-                                outUV2 = uv1;
-                                outN2 = n1;
-                                outD2 = d1;
-                            }
+                            if (b0) { inV = cv0; outV1 = cv1; outV2 = cv2; inD = d0; outD1 = d1; outD2 = d2; }
+                            else if (b1) { inV = cv1; outV1 = cv2; outV2 = cv0; inD = d1; outD1 = d2; outD2 = d0; }
+                            else { inV = cv2; outV1 = cv0; outV2 = cv1; inD = d2; outD1 = d0; outD2 = d1; }
 
                             float t1 = inD / (inD - outD1);
                             float t2 = inD / (inD - outD2);
 
-                            temporaryvertices[temporaryverticescount] = inV;
-                            temporaryvertices[temporaryverticescount + 1] = Vector4.Lerp(inV, outV1, t1);
-                            temporaryvertices[temporaryverticescount + 2] = Vector4.Lerp(inV, outV2, t2);
-                            temporaryverticescount += 3;
-                            temporarytextures[temporarytexturescount] = inUV;
-                            temporarytextures[temporarytexturescount + 1] = Vector3.Lerp(inUV, outUV1, t1);
-                            temporarytextures[temporarytexturescount + 2] = Vector3.Lerp(inUV, outUV2, t2);
-                            temporarytexturescount += 3;
-                            temporarynormals[temporarynormalscount] = inN;
-                            temporarynormals[temporarynormalscount + 1] = Vector3.Normalize(Vector3.Lerp(inN, outN1, t1));
-                            temporarynormals[temporarynormalscount + 2] = Vector3.Normalize(Vector3.Lerp(inN, outN2, t2));
-                            temporarynormalscount += 3;
-                            processbool[d] = false;
-                            processbool[d + 1] = false;
-                            processbool[d + 2] = false;
+                            temporaryPipeline[temporaryCount] = inV;
 
-                            AddTriangles += 1;
+                            temporaryPipeline[temporaryCount + 1] = new ClipVertex
+                            {
+                                c = Vector4.Lerp(inV.c, outV1.c, t1),
+                                t = Vector3.Lerp(inV.t, outV1.t, t1),
+                                n = Vector3.Normalize(Vector3.Lerp(inV.n, outV1.n, t1)),
+                                b = true
+                            };
+
+                            temporaryPipeline[temporaryCount + 2] = new ClipVertex
+                            {
+                                c = Vector4.Lerp(inV.c, outV2.c, t2),
+                                t = Vector3.Lerp(inV.t, outV2.t, t2),
+                                n = Vector3.Normalize(Vector3.Lerp(inV.n, outV2.n, t2)),
+                                b = true
+                            };
+
+                            temporaryCount += 3;
+
+                            processPipeline[d].b = false;
+                            processPipeline[d + 1].b = false;
+                            processPipeline[d + 2].b = false;
+                            addedTriangles += 1;
                         }
                         else if ((!b0 && b1 && b2) || (b0 && !b1 && b2) || (b0 && b1 && !b2))
                         {
-                            Vector4 inV1, inV2, outV;
-                            Vector3 inUV1, inUV2, outUV;
-                            Vector3 inN1, inN2, outN;
+                            ClipVertex inV1, inV2, outV;
                             float inD1, inD2, outD;
 
-                            if (!b0)
-                            {
-                                outV = v0;
-                                outUV = uv0;
-                                outN = n0;
-                                outD = d0;
-                                inV1 = v1;
-                                inUV1 = uv1;
-                                inN1 = n1;
-                                inD1 = d1;
-                                inV2 = v2;
-                                inUV2 = uv2;
-                                inN2 = n2;
-                                inD2 = d2;
-                            }
-                            else if (!b1)
-                            {
-                                outV = v1;
-                                outUV = uv1;
-                                outN = n1;
-                                outD = d1;
-                                inV1 = v2;
-                                inUV1 = uv2;
-                                inN1 = n2;
-                                inD1 = d2;
-                                inV2 = v0;
-                                inUV2 = uv0;
-                                inN2 = n0;
-                                inD2 = d0;
-                            }
-                            else
-                            {
-                                outV = v2;
-                                outUV = uv2;
-                                outN = n2;
-                                outD = d2;
-                                inV1 = v0;
-                                inUV1 = uv0;
-                                inN1 = n0;
-                                inD1 = d0;
-                                inV2 = v1;
-                                inUV2 = uv1;
-                                inN2 = n1;
-                                inD2 = d1;
-                            }
+                            if (!b0) { outV = cv0; inV1 = cv1; inV2 = cv2; outD = d0; inD1 = d1; inD2 = d2; }
+                            else if (!b1) { outV = cv1; inV1 = cv2; inV2 = cv0; outD = d1; inD1 = d2; inD2 = d0; }
+                            else { outV = cv2; inV1 = cv0; inV2 = cv1; outD = d2; inD1 = d0; inD2 = d1; }
 
                             float t1 = inD1 / (inD1 - outD);
                             float t2 = inD2 / (inD2 - outD);
 
-                            Vector4 vA = Vector4.Lerp(inV1, outV, t1);
-                            Vector4 vB = Vector4.Lerp(inV2, outV, t2);
+                            ClipVertex vA = new ClipVertex
+                            {
+                                c = Vector4.Lerp(inV1.c, outV.c, t1),
+                                t = Vector3.Lerp(inV1.t, outV.t, t1),
+                                n = Vector3.Normalize(Vector3.Lerp(inV1.n, outV.n, t1)),
+                                b = true
+                            };
 
-                            Vector3 uvA = Vector3.Lerp(inUV1, outUV, t1);
-                            Vector3 uvB = Vector3.Lerp(inUV2, outUV, t2);
+                            ClipVertex vB = new ClipVertex
+                            {
+                                c = Vector4.Lerp(inV2.c, outV.c, t2),
+                                t = Vector3.Lerp(inV2.t, outV.t, t2),
+                                n = Vector3.Normalize(Vector3.Lerp(inV2.n, outV.n, t2)),
+                                b = true
+                            };
 
-                            Vector3 nA = Vector3.Normalize(Vector3.Lerp(inN1, outN, t1));
-                            Vector3 nB = Vector3.Normalize(Vector3.Lerp(inN2, outN, t2));
+                            temporaryPipeline[temporaryCount] = inV1;
+                            temporaryPipeline[temporaryCount + 1] = inV2;
+                            temporaryPipeline[temporaryCount + 2] = vA;
 
-                            temporaryvertices[temporaryverticescount] = inV1;
-                            temporaryvertices[temporaryverticescount + 1] = inV2;
-                            temporaryvertices[temporaryverticescount + 2] = vA;
-                            temporaryverticescount += 3;
-                            temporarytextures[temporarytexturescount] = inUV1;
-                            temporarytextures[temporarytexturescount + 1] = inUV2;
-                            temporarytextures[temporarytexturescount + 2] = uvA;
-                            temporarytexturescount += 3;
-                            temporarynormals[temporarynormalscount] = inN1;
-                            temporarynormals[temporarynormalscount + 1] = inN2;
-                            temporarynormals[temporarynormalscount + 2] = nA;
-                            temporarynormalscount += 3;
-                            temporaryvertices[temporaryverticescount] = vA;
-                            temporaryvertices[temporaryverticescount + 1] = inV2;
-                            temporaryvertices[temporaryverticescount + 2] = vB;
-                            temporaryverticescount += 3;
-                            temporarytextures[temporarytexturescount] = uvA;
-                            temporarytextures[temporarytexturescount + 1] = inUV2;
-                            temporarytextures[temporarytexturescount + 2] = uvB;
-                            temporarytexturescount += 3;
-                            temporarynormals[temporarynormalscount] = nA;
-                            temporarynormals[temporarynormalscount + 1] = inN2;
-                            temporarynormals[temporarynormalscount + 2] = nB;
-                            temporarynormalscount += 3;
-                            processbool[d] = false;
-                            processbool[d + 1] = false;
-                            processbool[d + 2] = false;
+                            temporaryPipeline[temporaryCount + 3] = vA;
+                            temporaryPipeline[temporaryCount + 4] = inV2;
+                            temporaryPipeline[temporaryCount + 5] = vB;
+                            temporaryCount += 6;
 
-                            AddTriangles += 2;
+                            processPipeline[d].b = false;
+                            processPipeline[d + 1].b = false;
+                            processPipeline[d + 2].b = false;
+                            addedTriangles += 2;
                         }
                         else
                         {
-                            processbool[d] = false;
-                            processbool[d + 1] = false;
-                            processbool[d + 2] = false;
+                            processPipeline[d].b = false;
+                            processPipeline[d + 1].b = false;
+                            processPipeline[d + 2].b = false;
                         }
                     }
 
-                    if (AddTriangles > 0)
+                    if (addedTriangles > 0)
                     {
-                        for (int e = 0; e < temporaryverticescount; e += 3)
+                        for (int e = 0; e < temporaryCount; e++)
                         {
-                            processvertices[processverticescount] = temporaryvertices[e];
-                            processvertices[processverticescount + 1] = temporaryvertices[e + 1];
-                            processvertices[processverticescount + 2] = temporaryvertices[e + 2];
-                            processverticescount += 3;
-                            processtextures[processtexturescount] = temporarytextures[e];
-                            processtextures[processtexturescount + 1] = temporarytextures[e + 1];
-                            processtextures[processtexturescount + 2] = temporarytextures[e + 2];
-                            processtexturescount += 3;
-                            processnormals[processnormalscount] = temporarynormals[e];
-                            processnormals[processnormalscount + 1] = temporarynormals[e + 1];
-                            processnormals[processnormalscount + 2] = temporarynormals[e + 2];
-                            processnormalscount += 3;
-                            processbool[processboolcount] = true;
-                            processbool[processboolcount + 1] = true;
-                            processbool[processboolcount + 2] = true;
-                            processboolcount += 3;
+                            processPipeline[processCount + e] = temporaryPipeline[e];
                         }
+                        processCount += temporaryCount;
                     }
                 }
 
-                for (int f = 0; f < processboolcount; f += 3)
+                for (int f = 0; f < processCount; f += 3)
                 {
-                    if (processbool[f] == true && processbool[f + 1] == true && processbool[f + 2] == true)
+                    if (processPipeline[f].b && processPipeline[f + 1].b && processPipeline[f + 2].b)
                     {
                         if (triangles >= 128)
                         {
@@ -639,13 +477,23 @@ public static class LevelFunctions
 
                         Triangle tri = new Triangle();
 
-                        float invw0 = 1.0f / processvertices[f].W;
-                        float invw1 = 1.0f / processvertices[f + 1].W;
-                        float invw2 = 1.0f / processvertices[f + 2].W;
+                        Vector4 c0 = processPipeline[f].c;
+                        Vector4 c1 = processPipeline[f + 1].c;
+                        Vector4 c2 = processPipeline[f + 2].c;
 
-                        Vector2 screen0 = new((processvertices[f].X * invw0 * 0.5f + 0.5f) * Width, (1.0f - (processvertices[f].Y * invw0 * 0.5f + 0.5f)) * Height);
-                        Vector2 screen1 = new((processvertices[f + 1].X * invw1 * 0.5f + 0.5f) * Width, (1.0f - (processvertices[f + 1].Y * invw1 * 0.5f + 0.5f)) * Height);
-                        Vector2 screen2 = new((processvertices[f + 2].X * invw2 * 0.5f + 0.5f) * Width, (1.0f - (processvertices[f + 2].Y * invw2 * 0.5f + 0.5f)) * Height);
+                        Vector3 t0 = processPipeline[f].t;
+                        Vector3 t1 = processPipeline[f + 1].t;
+                        Vector3 t2 = processPipeline[f + 2].t;
+
+                        Vector3 n = processPipeline[f].n;
+
+                        float invw0 = 1.0f / c0.W;
+                        float invw1 = 1.0f / c1.W;
+                        float invw2 = 1.0f / c2.W;
+
+                        Vector2 screen0 = new((c0.X * invw0 * 0.5f + 0.5f) * Width, (1.0f - (c0.Y * invw0 * 0.5f + 0.5f)) * Height);
+                        Vector2 screen1 = new((c1.X * invw1 * 0.5f + 0.5f) * Width, (1.0f - (c1.Y * invw1 * 0.5f + 0.5f)) * Height);
+                        Vector2 screen2 = new((c2.X * invw2 * 0.5f + 0.5f) * Width, (1.0f - (c2.Y * invw2 * 0.5f + 0.5f)) * Height);
 
                         float area = (screen0.Y - screen1.Y) * screen2.X +
                                      (screen1.X - screen0.X) * screen2.Y +
@@ -656,22 +504,16 @@ public static class LevelFunctions
                             continue;
                         }
 
-                        tri.invz0 = processvertices[f].Z * invw0;
-                        tri.invz1 = processvertices[f + 1].Z * invw1;
-                        tri.invz2 = processvertices[f + 2].Z * invw2;
+                        tri.invz0 = c0.Z * invw0;
+                        tri.invz1 = c1.Z * invw1;
+                        tri.invz2 = c2.Z * invw2;
 
-                        tri.invuv0 = new(processtextures[f].X * invw0, processtextures[f].Y * invw0);
-                        tri.invuv1 = new(processtextures[f + 1].X * invw1, processtextures[f + 1].Y * invw1);
-                        tri.invuv2 = new(processtextures[f + 2].X * invw2, processtextures[f + 2].Y * invw2);
+                        tri.invuv0 = new(t0.X * invw0, t0.Y * invw0);
+                        tri.invuv1 = new(t1.X * invw1, t1.Y * invw1);
+                        tri.invuv2 = new(t2.X * invw2, t2.Y * invw2);
 
-                        tri.invw0 = invw0;
-                        tri.invw1 = invw1;
-                        tri.invw2 = invw2;
-
-                        tri.screen0 = screen0;
-                        tri.screen1 = screen1;
-                        tri.screen2 = screen2;
-
+                        tri.invw0 = invw0; tri.invw1 = invw1; tri.invw2 = invw2;
+                        tri.screen0 = screen0; tri.screen1 = screen1; tri.screen2 = screen2;
                         tri.invArea = 1.0f / area;
 
                         tri.edgeA0 = tri.screen1.Y - tri.screen2.Y;
@@ -681,48 +523,26 @@ public static class LevelFunctions
                         tri.edgeA1 = tri.screen2.Y - tri.screen0.Y;
                         tri.edgeB1 = tri.screen0.X - tri.screen2.X;
                         tri.edgeC1 = tri.screen2.X * tri.screen0.Y - tri.screen2.Y * tri.screen0.X;
-
                         tri.edgeA2 = tri.screen0.Y - tri.screen1.Y;
                         tri.edgeB2 = tri.screen1.X - tri.screen0.X;
                         tri.edgeC2 = tri.screen0.X * tri.screen1.Y - tri.screen0.Y * tri.screen1.X;
-
-                        float a0 = tri.edgeA0 * tri.invArea;
-                        float a1 = tri.edgeA1 * tri.invArea;
-                        float a2 = tri.edgeA2 * tri.invArea;
-
-                        float b0 = tri.edgeB0 * tri.invArea;
-                        float b1 = tri.edgeB1 * tri.invArea;
-                        float b2 = tri.edgeB2 * tri.invArea;
-
-                        tri.invuv0.X = tri.invuv0.X * texWidth;
-                        tri.invuv0.Y = tri.invuv0.Y * texHeight;
-
-                        tri.invuv1.X = tri.invuv1.X * texWidth;
-                        tri.invuv1.Y = tri.invuv1.Y * texHeight;
-
-                        tri.invuv2.X = tri.invuv2.X * texWidth;
-                        tri.invuv2.Y = tri.invuv2.Y * texHeight;
-
+                        float a0 = tri.edgeA0 * tri.invArea; float a1 = tri.edgeA1 * tri.invArea; float a2 = tri.edgeA2 * tri.invArea;
+                        float b0 = tri.edgeB0 * tri.invArea; float b1 = tri.edgeB1 * tri.invArea; float b2 = tri.edgeB2 * tri.invArea;
+                        tri.invuv0.X *= texWidth; tri.invuv0.Y *= texHeight;
+                        tri.invuv1.X *= texWidth; tri.invuv1.Y *= texHeight;
+                        tri.invuv2.X *= texWidth; tri.invuv2.Y *= texHeight;
                         tri.invwx = a0 * tri.invw0 + a1 * tri.invw1 + a2 * tri.invw2;
                         tri.invwy = b0 * tri.invw0 + b1 * tri.invw1 + b2 * tri.invw2;
-
                         tri.invzx = a0 * tri.invz0 + a1 * tri.invz1 + a2 * tri.invz2;
                         tri.invzy = b0 * tri.invz0 + b1 * tri.invz1 + b2 * tri.invz2;
-
                         tri.invux = a0 * tri.invuv0.X + a1 * tri.invuv1.X + a2 * tri.invuv2.X;
                         tri.invuy = b0 * tri.invuv0.X + b1 * tri.invuv1.X + b2 * tri.invuv2.X;
-
                         tri.invvx = a0 * tri.invuv0.Y + a1 * tri.invuv1.Y + a2 * tri.invuv2.Y;
                         tri.invvy = b0 * tri.invuv0.Y + b1 * tri.invuv1.Y + b2 * tri.invuv2.Y;
-
-                        float rawDiffuse = Vector3.Dot(processnormals[f], lightDir) * 0.5f + 0.5f;
-
+                        float rawDiffuse = Vector3.Dot(n, lightDir) * 0.5f + 0.5f;
                         rawDiffuse = MathF.Min(1.0f, (rawDiffuse * rawDiffuse) + 0.2f);
-
                         tri.diffuse = Math.Clamp(rawDiffuse, 0.0f, 1.0f);
-
-                        tri.texture = (int)processtextures[f].Z;
-
+                        tri.texture = (int)t0.Z;
                         ArrayOfTriangles[(a * 128) + triangles] = tri;
                         triangles += 1;
                     }
@@ -790,25 +610,17 @@ public static class LevelFunctions
                         for (int x = startTileX; x <= endTileX; x++)
                         {
                             int tileIndex = y * tilesX + x;
-                            Tile tile = tiles[tileIndex];
+                            int tileCount = tilesX * tilesY;
 
-                            if (tiles[tileIndex].frameFlag != frameAlternate)
-                            {
-                                tiles[tileIndex].triangleCount = 0;
-                                tiles[tileIndex].frameFlag = frameAlternate;
-                            }
-
-                            int triangleCount = tiles[tileIndex].triangleCount;
-
-                            if (triangleCount >= 128)
+                            if (triangleCount[tileIndex] >= 128)
                             {
                                 continue;
                             }
 
-                            int tileMinX = Math.Max(tile.minx, combinedXmin);
-                            int tileMinY = Math.Max(tile.miny, combinedYmin);
-                            int tileMaxX = Math.Min(tile.maxx, combinedXmax);
-                            int tileMaxY = Math.Min(tile.maxy, combinedYmax);
+                            int tileMinX = Math.Max(x * tileSizeX, combinedXmin);
+                            int tileMinY = Math.Max(y * tileSizeY, combinedYmin);
+                            int tileMaxX = Math.Min((x + 1) * tileSizeX, combinedXmax);
+                            int tileMaxY = Math.Min((y + 1) * tileSizeY, combinedYmax);
 
                             if (tileMinX >= tileMaxX || tileMinY >= tileMaxY)
                             {
@@ -849,7 +661,7 @@ public static class LevelFunctions
                                 e1c0 <= 0f && e1c1 <= 0f && e1c2 <= 0f && e1c3 <= 0f &&
                                 e2c0 <= 0f && e2c1 <= 0f && e2c2 <= 0f && e2c3 <= 0f)
                             {
-                                int fullDestIndex = (tileIndex * 128) + triangleCount;
+                                int fullDestIndex = (tileIndex * 128) + triangleCount[tileIndex];
 
                                 TileTriangle fullTileTri = new TileTriangle
                                 {
@@ -862,7 +674,7 @@ public static class LevelFunctions
                                 };
 
                                 ArrayOfTileTriangles[fullDestIndex] = fullTileTri;
-                                tiles[tileIndex].triangleCount += 1;
+                                triangleCount[tileIndex] += 1;
 
                                 continue;
                             }
@@ -897,7 +709,7 @@ public static class LevelFunctions
                                 continue;
                             }
 
-                            int partialDestIndex = (tileIndex * 128) + triangleCount;
+                            int partialDestIndex = (tileIndex * 128) + triangleCount[tileIndex];
 
                             TileTriangle partialTileTri = new TileTriangle
                             {
@@ -910,7 +722,7 @@ public static class LevelFunctions
                             };
 
                             ArrayOfTileTriangles[partialDestIndex] = partialTileTri;
-                            tiles[tileIndex].triangleCount += 1;
+                            triangleCount[tileIndex] += 1;
                         }
                     }
                 }
@@ -1257,17 +1069,13 @@ public static class LevelFunctions
         return new Vector3(vertex.X * invw, vertex.Y * invw, vertex.Z * invw);
     }
 
-    public static void BuildGeometry(List<Sector> sectors, List<Vector2> vertices, double Ceiling, double Floor, List<Vector3> temporaryVertices, List<Vector3> temporaryTextures, List<Vector3> temporaryNormals, List<int> temporaryTriangles, MathematicalPlane LeftPlane, MathematicalPlane TopPlane, List<MathematicalPlane> planes, List<Vector3> edges, List<int> lines, List<PortalMeta> portals, List<Vector3> ceilingVertices, List<Vector3> ceilingTextures, List<int> ceilingTriangles, List<Vector3> floorVertices, List<Vector3> floorTextures, List<int> floorTriangles, List<MeshMeta> meshes, List<ColliderMeta> collision, List<Vector3> Vertices, List<Vector3> Textures, List<Vector3> Normals, List<int> Indices, List<SectorMeta> Sectors)
+    public static void BuildGeometry(List<Sector> sectors, List<Vector2> vertices, double Ceiling, double Floor, List<Vertex> temporaryVertices, List<int> temporaryTriangles, MathematicalPlane LeftPlane, MathematicalPlane TopPlane, List<MathematicalPlane> planes, List<Vector3> edges, List<int> lines, List<PortalMeta> portals, List<Vector3> ceilingVertices, List<Vector3> ceilingTextures, List<int> ceilingTriangles, List<Vector3> floorVertices, List<Vector3> floorTextures, List<int> floorTriangles, List<MeshMeta> meshes, List<Vertex> Vertices, List<int> Indices, List<SectorMeta> Sectors)
     {
         int portalStart = 0;
 
         int planeStart = 0;
 
         int verticesStart = 0;
-
-        int texturesStart = 0;
-
-        int normalsStart = 0;
 
         int indicesStart = 0;
 
@@ -1276,10 +1084,6 @@ public static class LevelFunctions
         for (int i = 0; i < sectors.Count; i++)
         {
             temporaryVertices.Clear();
-
-            temporaryTextures.Clear();
-
-            temporaryNormals.Clear();
 
             temporaryTriangles.Clear();
 
@@ -1309,10 +1113,26 @@ public static class LevelFunctions
 
                     int baseVert = temporaryVertices.Count;
 
-                    temporaryVertices.Add(new Vector3((float)Z0, (float)V0, (float)X0));
-                    temporaryVertices.Add(new Vector3((float)Z0, (float)V1, (float)X0));
-                    temporaryVertices.Add(new Vector3((float)Z1, (float)V1, (float)X1));
-                    temporaryVertices.Add(new Vector3((float)Z1, (float)V0, (float)X1));
+                    Vector3 pos0 = new Vector3((float)Z0, (float)V0, (float)X0);
+                    Vector3 pos1 = new Vector3((float)Z0, (float)V1, (float)X0);
+                    Vector3 pos2 = new Vector3((float)Z1, (float)V1, (float)X1);
+                    Vector3 pos3 = new Vector3((float)Z1, (float)V0, (float)X1);
+
+                    Vector3 n = Vector3.Normalize(Vector3.Cross(pos1 - pos0, pos2 - pos0));
+
+                    Vector3 leftPlaneNormal = Vector3.Normalize(pos2 - pos1);
+                    float leftPlaneDistance = -Vector3.Dot(leftPlaneNormal, pos1);
+
+                    Vector3 topPlaneNormal = Vector3.Normalize(pos1 - pos0);
+                    float topPlaneDistance = -Vector3.Dot(topPlaneNormal, pos1);
+
+                    LeftPlane = new MathematicalPlane { normal = leftPlaneNormal, distance = leftPlaneDistance };
+                    TopPlane = new MathematicalPlane { normal = topPlaneNormal, distance = topPlaneDistance };
+
+                    temporaryVertices.Add(new Vertex { v = pos0, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos0) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos0) / 2.5f, 0) });
+                    temporaryVertices.Add(new Vertex { v = pos1, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos1) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos1) / 2.5f, 0) });
+                    temporaryVertices.Add(new Vertex { v = pos2, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos2) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos2) / 2.5f, 0) });
+                    temporaryVertices.Add(new Vertex { v = pos3, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos3) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos3) / 2.5f, 0) });
 
                     temporaryTriangles.Add(baseVert);
                     temporaryTriangles.Add(baseVert + 1);
@@ -1321,40 +1141,8 @@ public static class LevelFunctions
                     temporaryTriangles.Add(baseVert + 2);
                     temporaryTriangles.Add(baseVert + 3);
 
-                    Vector3 v0 = temporaryVertices[baseVert];
-                    Vector3 v1 = temporaryVertices[baseVert + 1];
-                    Vector3 v2 = temporaryVertices[baseVert + 2];
-
-                    Vector3 n = Vector3.Normalize(Vector3.Cross(v1 - v0, v2 - v0));
-
-                    Vector3 leftPlaneNormal = Vector3.Normalize(v2 - v1);
-
-                    float leftPlaneDistance = -Vector3.Dot(leftPlaneNormal, v1);
-
-                    Vector3 topPlaneNormal = Vector3.Normalize(v1 - v0);
-                    float topPlaneDistance = -Vector3.Dot(topPlaneNormal, v1);
-
-                    LeftPlane = new MathematicalPlane { normal = leftPlaneNormal, distance = leftPlaneDistance };
-                    TopPlane = new MathematicalPlane { normal = topPlaneNormal, distance = topPlaneDistance };
-
-                    temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert]) / 2.5f, 0));
-                    temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 1]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 1]) / 2.5f, 0));
-                    temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 2]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 2]) / 2.5f, 0));
-                    temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 3]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 3]) / 2.5f, 0));
-
-                    temporaryNormals.Add(n);
-                    temporaryNormals.Add(n);
-                    temporaryNormals.Add(n);
-                    temporaryNormals.Add(n);
-
-                    MathematicalPlane plane = new MathematicalPlane
-                    {
-                        normal = n,
-                        distance = -Vector3.Dot(n, v0)
-                    };
-
+                    MathematicalPlane plane = new MathematicalPlane { normal = n, distance = -Vector3.Dot(n, pos0) };
                     planes.Add(plane);
-
                     planeCount += 1;
                 }
                 else
@@ -1364,22 +1152,30 @@ public static class LevelFunctions
                         if (sector.floorHeight < sectors[wall].ceilingHeight)
                         {
                             double C0 = sector.ceilingHeight / 8 * 2.5f;
-
-                            if (sector.ceilingHeight > sectors[wall].ceilingHeight)
-                            {
-                                Ceiling = sectors[wall].ceilingHeight / 8 * 2.5f;
-                            }
-                            else
-                            {
-                                Ceiling = sector.ceilingHeight / 8 * 2.5f;
-                            }
+                            Ceiling = sector.ceilingHeight > sectors[wall].ceilingHeight ? sectors[wall].ceilingHeight / 8 * 2.5f : sector.ceilingHeight / 8 * 2.5f;
 
                             int baseVert = temporaryVertices.Count;
 
-                            temporaryVertices.Add(new Vector3((float)Z0, (float)Ceiling, (float)X0));
-                            temporaryVertices.Add(new Vector3((float)Z0, (float)C0, (float)X0));
-                            temporaryVertices.Add(new Vector3((float)Z1, (float)C0, (float)X1));
-                            temporaryVertices.Add(new Vector3((float)Z1, (float)Ceiling, (float)X1));
+                            Vector3 pos0 = new Vector3((float)Z0, (float)Ceiling, (float)X0);
+                            Vector3 pos1 = new Vector3((float)Z0, (float)C0, (float)X0);
+                            Vector3 pos2 = new Vector3((float)Z1, (float)C0, (float)X1);
+                            Vector3 pos3 = new Vector3((float)Z1, (float)Ceiling, (float)X1);
+
+                            Vector3 n = Vector3.Normalize(Vector3.Cross(pos1 - pos0, pos2 - pos0));
+
+                            Vector3 leftPlaneNormal = Vector3.Normalize(pos2 - pos1);
+                            float leftPlaneDistance = -Vector3.Dot(leftPlaneNormal, pos1);
+
+                            Vector3 topPlaneNormal = Vector3.Normalize(pos1 - pos0);
+                            float topPlaneDistance = -Vector3.Dot(topPlaneNormal, pos1);
+
+                            LeftPlane = new MathematicalPlane { normal = leftPlaneNormal, distance = leftPlaneDistance };
+                            TopPlane = new MathematicalPlane { normal = topPlaneNormal, distance = topPlaneDistance };
+
+                            temporaryVertices.Add(new Vertex { v = pos0, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos0) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos0) / 2.5f, 0) });
+                            temporaryVertices.Add(new Vertex { v = pos1, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos1) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos1) / 2.5f, 0) });
+                            temporaryVertices.Add(new Vertex { v = pos2, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos2) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos2) / 2.5f, 0) });
+                            temporaryVertices.Add(new Vertex { v = pos3, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos3) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos3) / 2.5f, 0) });
 
                             temporaryTriangles.Add(baseVert);
                             temporaryTriangles.Add(baseVert + 1);
@@ -1388,39 +1184,8 @@ public static class LevelFunctions
                             temporaryTriangles.Add(baseVert + 2);
                             temporaryTriangles.Add(baseVert + 3);
 
-                            Vector3 v0 = temporaryVertices[baseVert];
-                            Vector3 v1 = temporaryVertices[baseVert + 1];
-                            Vector3 v2 = temporaryVertices[baseVert + 2];
-
-                            Vector3 n = Vector3.Normalize(Vector3.Cross(v1 - v0, v2 - v0));
-
-                            Vector3 leftPlaneNormal = Vector3.Normalize(v2 - v1);
-                            float leftPlaneDistance = -Vector3.Dot(leftPlaneNormal, v1);
-
-                            Vector3 topPlaneNormal = Vector3.Normalize(v1 - v0);
-                            float topPlaneDistance = -Vector3.Dot(topPlaneNormal, v1);
-
-                            LeftPlane = new MathematicalPlane { normal = leftPlaneNormal, distance = leftPlaneDistance };
-                            TopPlane = new MathematicalPlane { normal = topPlaneNormal, distance = topPlaneDistance };
-
-                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert]) / 2.5f, 0));
-                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 1]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 1]) / 2.5f, 0));
-                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 2]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 2]) / 2.5f, 0));
-                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 3]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 3]) / 2.5f, 0));
-
-                            temporaryNormals.Add(n);
-                            temporaryNormals.Add(n);
-                            temporaryNormals.Add(n);
-                            temporaryNormals.Add(n);
-
-                            MathematicalPlane plane = new MathematicalPlane
-                            {
-                                normal = n,
-                                distance = -Vector3.Dot(n, v0)
-                            };
-
+                            MathematicalPlane plane = new MathematicalPlane { normal = n, distance = -Vector3.Dot(n, pos0) };
                             planes.Add(plane);
-
                             planeCount += 1;
                         }
                         else
@@ -1430,10 +1195,26 @@ public static class LevelFunctions
 
                             int baseVert = temporaryVertices.Count;
 
-                            temporaryVertices.Add(new Vector3((float)Z0, (float)C1, (float)X0));
-                            temporaryVertices.Add(new Vector3((float)Z0, (float)C0, (float)X0));
-                            temporaryVertices.Add(new Vector3((float)Z1, (float)C0, (float)X1));
-                            temporaryVertices.Add(new Vector3((float)Z1, (float)C1, (float)X1));
+                            Vector3 pos0 = new Vector3((float)Z0, (float)C1, (float)X0);
+                            Vector3 pos1 = new Vector3((float)Z0, (float)C0, (float)X0);
+                            Vector3 pos2 = new Vector3((float)Z1, (float)C0, (float)X1);
+                            Vector3 pos3 = new Vector3((float)Z1, (float)C1, (float)X1);
+
+                            Vector3 n = Vector3.Normalize(Vector3.Cross(pos1 - pos0, pos2 - pos0));
+
+                            Vector3 leftPlaneNormal = Vector3.Normalize(pos2 - pos1);
+                            float leftPlaneDistance = -Vector3.Dot(leftPlaneNormal, pos1);
+
+                            Vector3 topPlaneNormal = Vector3.Normalize(pos1 - pos0);
+                            float topPlaneDistance = -Vector3.Dot(topPlaneNormal, pos1);
+
+                            LeftPlane = new MathematicalPlane { normal = leftPlaneNormal, distance = leftPlaneDistance };
+                            TopPlane = new MathematicalPlane { normal = topPlaneNormal, distance = topPlaneDistance };
+
+                            temporaryVertices.Add(new Vertex { v = pos0, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos0) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos0) / 2.5f, 0) });
+                            temporaryVertices.Add(new Vertex { v = pos1, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos1) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos1) / 2.5f, 0) });
+                            temporaryVertices.Add(new Vertex { v = pos2, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos2) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos2) / 2.5f, 0) });
+                            temporaryVertices.Add(new Vertex { v = pos3, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos3) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos3) / 2.5f, 0) });
 
                             temporaryTriangles.Add(baseVert);
                             temporaryTriangles.Add(baseVert + 1);
@@ -1442,36 +1223,7 @@ public static class LevelFunctions
                             temporaryTriangles.Add(baseVert + 2);
                             temporaryTriangles.Add(baseVert + 3);
 
-                            Vector3 v0 = temporaryVertices[baseVert];
-                            Vector3 v1 = temporaryVertices[baseVert + 1];
-                            Vector3 v2 = temporaryVertices[baseVert + 2];
-
-                            Vector3 n = Vector3.Normalize(Vector3.Cross(v1 - v0, v2 - v0));
-
-                            Vector3 leftPlaneNormal = Vector3.Normalize(v2 - v1);
-                            float leftPlaneDistance = -Vector3.Dot(leftPlaneNormal, v1);
-
-                            Vector3 topPlaneNormal = Vector3.Normalize(v1 - v0);
-                            float topPlaneDistance = -Vector3.Dot(topPlaneNormal, v1);
-
-                            LeftPlane = new MathematicalPlane { normal = leftPlaneNormal, distance = leftPlaneDistance };
-                            TopPlane = new MathematicalPlane { normal = topPlaneNormal, distance = topPlaneDistance };
-
-                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert]) / 2.5f, 0));
-                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 1]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 1]) / 2.5f, 0));
-                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 2]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 2]) / 2.5f, 0));
-                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 3]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 3]) / 2.5f, 0));
-
-                            temporaryNormals.Add(n);
-                            temporaryNormals.Add(n);
-                            temporaryNormals.Add(n);
-                            temporaryNormals.Add(n);
-
-                            MathematicalPlane plane = new MathematicalPlane
-                            {
-                                normal = n,
-                                distance = -Vector3.Dot(n, v0)
-                            };
+                            MathematicalPlane plane = new MathematicalPlane { normal = n, distance = -Vector3.Dot(n, pos0) };
 
                             planes.Add(plane);
 
@@ -1558,117 +1310,61 @@ public static class LevelFunctions
                         if (sector.ceilingHeight > sectors[wall].floorHeight)
                         {
                             double F0 = sector.floorHeight / 8 * 2.5f;
-
-                            if (sector.floorHeight > sectors[wall].floorHeight)
-                            {
-                                Floor = sector.floorHeight / 8 * 2.5f;
-                            }
-                            else
-                            {
-                                Floor = sectors[wall].floorHeight / 8 * 2.5f;
-                            }
-
+                            Floor = sector.floorHeight > sectors[wall].floorHeight ? sector.floorHeight / 8 * 2.5f : sectors[wall].floorHeight / 8 * 2.5f;
                             int baseVert = temporaryVertices.Count;
-
-                            temporaryVertices.Add(new Vector3((float)Z0, (float)F0, (float)X0));
-                            temporaryVertices.Add(new Vector3((float)Z0, (float)Floor, (float)X0));
-                            temporaryVertices.Add(new Vector3((float)Z1, (float)Floor, (float)X1));
-                            temporaryVertices.Add(new Vector3((float)Z1, (float)F0, (float)X1));
-
+                            Vector3 pos0 = new Vector3((float)Z0, (float)F0, (float)X0);
+                            Vector3 pos1 = new Vector3((float)Z0, (float)Floor, (float)X0);
+                            Vector3 pos2 = new Vector3((float)Z1, (float)Floor, (float)X1);
+                            Vector3 pos3 = new Vector3((float)Z1, (float)F0, (float)X1);
+                            Vector3 n = Vector3.Normalize(Vector3.Cross(pos1 - pos0, pos2 - pos0));
+                            Vector3 leftPlaneNormal = Vector3.Normalize(pos2 - pos1);
+                            float leftPlaneDistance = -Vector3.Dot(leftPlaneNormal, pos1);
+                            Vector3 topPlaneNormal = Vector3.Normalize(pos1 - pos0);
+                            float topPlaneDistance = -Vector3.Dot(topPlaneNormal, pos1);
+                            LeftPlane = new MathematicalPlane { normal = leftPlaneNormal, distance = leftPlaneDistance };
+                            TopPlane = new MathematicalPlane { normal = topPlaneNormal, distance = topPlaneDistance };
+                            temporaryVertices.Add(new Vertex { v = pos0, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos0) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos0) / 2.5f, 3) });
+                            temporaryVertices.Add(new Vertex { v = pos1, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos1) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos1) / 2.5f, 3) });
+                            temporaryVertices.Add(new Vertex { v = pos2, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos2) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos2) / 2.5f, 3) });
+                            temporaryVertices.Add(new Vertex { v = pos3, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos3) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos3) / 2.5f, 3) });
                             temporaryTriangles.Add(baseVert);
                             temporaryTriangles.Add(baseVert + 1);
                             temporaryTriangles.Add(baseVert + 2);
                             temporaryTriangles.Add(baseVert);
                             temporaryTriangles.Add(baseVert + 2);
                             temporaryTriangles.Add(baseVert + 3);
-
-                            Vector3 v0 = temporaryVertices[baseVert];
-                            Vector3 v1 = temporaryVertices[baseVert + 1];
-                            Vector3 v2 = temporaryVertices[baseVert + 2];
-
-                            Vector3 n = Vector3.Normalize(Vector3.Cross(v1 - v0, v2 - v0));
-
-                            Vector3 leftPlaneNormal = Vector3.Normalize(v2 - v1);
-                            float leftPlaneDistance = -Vector3.Dot(leftPlaneNormal, v1);
-
-                            Vector3 topPlaneNormal = Vector3.Normalize(v1 - v0);
-                            float topPlaneDistance = -Vector3.Dot(topPlaneNormal, v1);
-
-                            LeftPlane = new MathematicalPlane { normal = leftPlaneNormal, distance = leftPlaneDistance };
-                            TopPlane = new MathematicalPlane { normal = topPlaneNormal, distance = topPlaneDistance };
-
-                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert]) / 2.5f, 3));
-                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 1]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 1]) / 2.5f, 3));
-                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 2]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 2]) / 2.5f, 3));
-                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 3]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 3]) / 2.5f, 3));
-
-                            temporaryNormals.Add(n);
-                            temporaryNormals.Add(n);
-                            temporaryNormals.Add(n);
-                            temporaryNormals.Add(n);
-
-                            MathematicalPlane plane = new MathematicalPlane
-                            {
-                                normal = n,
-                                distance = -Vector3.Dot(n, v0)
-                            };
-
+                            MathematicalPlane plane = new MathematicalPlane { normal = n, distance = -Vector3.Dot(n, pos0) };
                             planes.Add(plane);
-
                             planeCount += 1;
                         }
                         else
                         {
                             double F0 = sector.floorHeight / 8 * 2.5f;
                             double F1 = sector.ceilingHeight / 8 * 2.5f;
-
                             int baseVert = temporaryVertices.Count;
-
-                            temporaryVertices.Add(new Vector3((float)Z0, (float)F0, (float)X0));
-                            temporaryVertices.Add(new Vector3((float)Z0, (float)F1, (float)X0));
-                            temporaryVertices.Add(new Vector3((float)Z1, (float)F1, (float)X1));
-                            temporaryVertices.Add(new Vector3((float)Z1, (float)F0, (float)X1));
-
+                            Vector3 pos0 = new Vector3((float)Z0, (float)F0, (float)X0);
+                            Vector3 pos1 = new Vector3((float)Z0, (float)F1, (float)X0);
+                            Vector3 pos2 = new Vector3((float)Z1, (float)F1, (float)X1);
+                            Vector3 pos3 = new Vector3((float)Z1, (float)F0, (float)X1);
+                            Vector3 n = Vector3.Normalize(Vector3.Cross(pos1 - pos0, pos2 - pos0));
+                            Vector3 leftPlaneNormal = Vector3.Normalize(pos2 - pos1);
+                            float leftPlaneDistance = -Vector3.Dot(leftPlaneNormal, pos1);
+                            Vector3 topPlaneNormal = Vector3.Normalize(pos1 - pos0);
+                            float topPlaneDistance = -Vector3.Dot(topPlaneNormal, pos1);
+                            LeftPlane = new MathematicalPlane { normal = leftPlaneNormal, distance = leftPlaneDistance };
+                            TopPlane = new MathematicalPlane { normal = topPlaneNormal, distance = topPlaneDistance };
+                            temporaryVertices.Add(new Vertex { v = pos0, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos0) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos0) / 2.5f, 3) });
+                            temporaryVertices.Add(new Vertex { v = pos1, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos1) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos1) / 2.5f, 3) });
+                            temporaryVertices.Add(new Vertex { v = pos2, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos2) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos2) / 2.5f, 3) });
+                            temporaryVertices.Add(new Vertex { v = pos3, n = n, t = new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, pos3) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, pos3) / 2.5f, 3) });
                             temporaryTriangles.Add(baseVert);
                             temporaryTriangles.Add(baseVert + 1);
                             temporaryTriangles.Add(baseVert + 2);
                             temporaryTriangles.Add(baseVert);
                             temporaryTriangles.Add(baseVert + 2);
                             temporaryTriangles.Add(baseVert + 3);
-
-                            Vector3 v0 = temporaryVertices[baseVert];
-                            Vector3 v1 = temporaryVertices[baseVert + 1];
-                            Vector3 v2 = temporaryVertices[baseVert + 2];
-
-                            Vector3 n = Vector3.Normalize(Vector3.Cross(v1 - v0, v2 - v0));
-
-                            Vector3 leftPlaneNormal = Vector3.Normalize(v2 - v1);
-                            float leftPlaneDistance = -Vector3.Dot(leftPlaneNormal, v1);
-
-                            Vector3 topPlaneNormal = Vector3.Normalize(v1 - v0);
-                            float topPlaneDistance = -Vector3.Dot(topPlaneNormal, v1);
-
-                            LeftPlane = new MathematicalPlane { normal = leftPlaneNormal, distance = leftPlaneDistance };
-                            TopPlane = new MathematicalPlane { normal = topPlaneNormal, distance = topPlaneDistance };
-
-                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert]) / 2.5f, 3));
-                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 1]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 1]) / 2.5f, 3));
-                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 2]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 2]) / 2.5f, 3));
-                            temporaryTextures.Add(new Vector3(GetPlaneSignedDistanceToPoint(LeftPlane, temporaryVertices[baseVert + 3]) / 2.5f, GetPlaneSignedDistanceToPoint(TopPlane, temporaryVertices[baseVert + 3]) / 2.5f, 3));
-
-                            temporaryNormals.Add(n);
-                            temporaryNormals.Add(n);
-                            temporaryNormals.Add(n);
-                            temporaryNormals.Add(n);
-
-                            MathematicalPlane plane = new MathematicalPlane
-                            {
-                                normal = n,
-                                distance = -Vector3.Dot(n, v0)
-                            };
-
+                            MathematicalPlane plane = new MathematicalPlane { normal = n, distance = -Vector3.Dot(n, pos0) };
                             planes.Add(plane);
-
                             planeCount += 1;
                         }
                     }
@@ -1760,81 +1456,37 @@ public static class LevelFunctions
                     ceilingTriangles.Add(e + 1);
                     ceilingTriangles.Add(e + 2);
                 }
-
                 int baseFloor = temporaryVertices.Count;
-
+                Vector3 f0 = floorVertices[floorTriangles[0]];
+                Vector3 f1 = floorVertices[floorTriangles[1]];
+                Vector3 f2 = floorVertices[floorTriangles[2]];
+                Vector3 f = Vector3.Normalize(Vector3.Cross(f1 - f0, f2 - f0));
                 for (int e = 0; e < floorVertices.Count; e++)
                 {
-                    temporaryVertices.Add(floorVertices[e]);
+                    temporaryVertices.Add(new Vertex { v = floorVertices[e], t = floorTextures[e], n = f });
                 }
-
-                for (int e = 0; e < floorTextures.Count; e++)
-                {
-                    temporaryTextures.Add(floorTextures[e]);
-                }
-
                 for (int e = 0; e < floorTriangles.Count; e++)
                 {
                     temporaryTriangles.Add(baseFloor + floorTriangles[e]);
                 }
-
-                Vector3 f0 = floorVertices[floorTriangles[0]];
-                Vector3 f1 = floorVertices[floorTriangles[1]];
-                Vector3 f2 = floorVertices[floorTriangles[2]];
-
-                Vector3 f = Vector3.Normalize(Vector3.Cross(f1 - f0, f2 - f0));
-
-                for (int e = 0; e < floorVertices.Count; e++)
-                {
-                    temporaryNormals.Add(f);
-                }
-
-                MathematicalPlane floorPlane = new MathematicalPlane
-                {
-                    normal = f,
-                    distance = -Vector3.Dot(f, f0)
-                };
-
+                MathematicalPlane floorPlane = new MathematicalPlane { normal = f, distance = -Vector3.Dot(f, f0) };
                 planes.Add(floorPlane);
-
                 planeCount += 1;
-
                 int baseCeiling = temporaryVertices.Count;
-
+                Vector3 ceil0 = ceilingVertices[ceilingTriangles[0]];
+                Vector3 ceil1 = ceilingVertices[ceilingTriangles[1]];
+                Vector3 ceil2 = ceilingVertices[ceilingTriangles[2]];
+                Vector3 c = Vector3.Normalize(Vector3.Cross(ceil1 - ceil0, ceil2 - ceil0));
                 for (int e = 0; e < ceilingVertices.Count; e++)
                 {
-                    temporaryVertices.Add(ceilingVertices[e]);
+                    temporaryVertices.Add(new Vertex { v = ceilingVertices[e], t = ceilingTextures[e], n = c });
                 }
-
-                for (int e = 0; e < ceilingTextures.Count; e++)
-                {
-                    temporaryTextures.Add(ceilingTextures[e]);
-                }
-
                 for (int e = 0; e < ceilingTriangles.Count; e++)
                 {
                     temporaryTriangles.Add(baseCeiling + ceilingTriangles[e]);
                 }
-
-                Vector3 ceil0 = ceilingVertices[ceilingTriangles[0]];
-                Vector3 ceil1 = ceilingVertices[ceilingTriangles[1]];
-                Vector3 ceil2 = ceilingVertices[ceilingTriangles[2]];
-
-                Vector3 c = Vector3.Normalize(Vector3.Cross(ceil1 - ceil0, ceil2 - ceil0));
-
-                for (int e = 0; e < ceilingVertices.Count; e++)
-                {
-                    temporaryNormals.Add(c);
-                }
-
-                MathematicalPlane ceilingPlane = new MathematicalPlane
-                {
-                    normal = c,
-                    distance = -Vector3.Dot(c, ceil0)
-                };
-
+                MathematicalPlane ceilingPlane = new MathematicalPlane { normal = c, distance = -Vector3.Dot(c, ceil0) };
                 planes.Add(ceilingPlane);
-
                 planeCount += 1;
             }
 
@@ -1852,10 +1504,6 @@ public static class LevelFunctions
 
             Vertices.AddRange(temporaryVertices);
 
-            Textures.AddRange(temporaryTextures);
-
-            Normals.AddRange(temporaryNormals);
-
             for (int j = 0; j < temporaryTriangles.Count; j++)
             {
                 int globalIndex = temporaryTriangles[j] + verticesStart;
@@ -1866,31 +1514,14 @@ public static class LevelFunctions
             {
                 verticesStartIndex = verticesStart,
                 verticesCount = temporaryVertices.Count,
-                texturesStartIndex = texturesStart,
-                texturesCount = temporaryTextures.Count,
-                normalsStartIndex = normalsStart,
-                normalsCount = temporaryNormals.Count,
                 indicesStartIndex = indicesStart,
                 indicesCount = temporaryTriangles.Count,
+                triangles = temporaryTriangles.Count / 3
             };
 
             meshes.Add(mesh);
 
-            ColliderMeta collider = new ColliderMeta
-            {
-                verticesStartIndex = verticesStart,
-                verticesCount = temporaryVertices.Count,
-                indicesStartIndex = indicesStart,
-                indicesCount = temporaryTriangles.Count,
-            };
-
-            collision.Add(collider);
-
             verticesStart += temporaryVertices.Count;
-
-            texturesStart += temporaryTextures.Count;
-
-            normalsStart += temporaryNormals.Count;
 
             indicesStart += temporaryTriangles.Count;
 
@@ -1902,44 +1533,47 @@ public static class LevelFunctions
         Console.WriteLine("Level built successfully!");
     }
 
-    public static Vector4 MakeRectangleWithEdges(Vector4 rectangle, PortalMeta portal, List<Vector3> OutEdgeVertices, Matrix4x4 CamViewProj, List<Vector3> edges, List<int> lines, Vector4[] processEdges, Vector4[] temporaryEdges, bool[] boolEdges)
+    public static Vector4 MakeRectangleWithEdges(
+     Vector4 rectangle,
+     PortalMeta portal,
+     List<Vector3> OutEdgeVertices,
+     Matrix4x4 CamViewProj,
+     List<Vector3> edges,
+     List<int> lines,
+     EdgeVertex[] processBuffer,
+     EdgeVertex[] temporaryBuffer)
     {
         OutEdgeVertices.Clear();
 
-        int processverticescount = 0;
-        int processboolcount = 0;
+        int processCount = 0;
 
         for (int a = portal.edgeStartIndex; a < portal.edgeStartIndex + portal.edgeCount; a += 2)
         {
             Vector4 v0clip = ConvertWorldToClip(CamViewProj, edges[lines[a]]);
             Vector4 v1clip = ConvertWorldToClip(CamViewProj, edges[lines[a + 1]]);
 
-            processEdges[processverticescount] = v0clip;
-            processEdges[processverticescount + 1] = v1clip;
-            processverticescount += 2;
-            boolEdges[processboolcount] = true;
-            boolEdges[processboolcount + 1] = true;
-            processboolcount += 2;
+            processBuffer[processCount] = new EdgeVertex { c = v0clip, b = true };
+            processBuffer[processCount + 1] = new EdgeVertex { c = v1clip, b = true };
+            processCount += 2;
         }
 
         for (int b = 0; b < 6; b++)
         {
             int intersection = 0;
-
-            int temporaryverticescount = 0;
+            int temporaryCount = 0;
 
             Vector4 intersectionPoint0 = Vector4.Zero;
             Vector4 intersectionPoint1 = Vector4.Zero;
 
-            for (int c = 0; c < processverticescount; c += 2)
+            for (int c = 0; c < processCount; c += 2)
             {
-                if (boolEdges[c] == false && boolEdges[c + 1] == false)
+                if (!processBuffer[c].b && !processBuffer[c + 1].b)
                 {
                     continue;
                 }
 
-                Vector4 v0 = processEdges[c];
-                Vector4 v1 = processEdges[c + 1];
+                Vector4 v0 = processBuffer[c].c;
+                Vector4 v1 = processBuffer[c + 1].c;
 
                 float minX = rectangle.X;
                 float minY = rectangle.Y;
@@ -1947,43 +1581,15 @@ public static class LevelFunctions
                 float maxY = rectangle.W;
 
                 float d0, d1;
-
                 switch (b)
                 {
-                    case 0: // Left
-                        d0 = v0.X - minX * v0.W;
-                        d1 = v1.X - minX * v1.W;
-                        break;
-
-                    case 1: // Right
-                        d0 = maxX * v0.W - v0.X;
-                        d1 = maxX * v1.W - v1.X;
-                        break;
-
-                    case 2: // Bottom
-                        d0 = v0.Y - minY * v0.W;
-                        d1 = v1.Y - minY * v1.W;
-                        break;
-
-                    case 3: // Top
-                        d0 = maxY * v0.W - v0.Y;
-                        d1 = maxY * v1.W - v1.Y;
-                        break;
-
-                    case 4: // Near
-                        d0 = v0.Z;
-                        d1 = v1.Z;
-                        break;
-
-                    case 5: // Far
-                        d0 = v0.W - v0.Z;
-                        d1 = v1.W - v1.Z;
-                        break;
-
-                    default:
-                        d0 = 0;
-                        d1 = 0;
-                        break;
+                    case 0: d0 = v0.X - minX * v0.W; d1 = v1.X - minX * v1.W; break; // Left
+                    case 1: d0 = maxX * v0.W - v0.X; d1 = maxX * v1.W - v1.X; break; // Right
+                    case 2: d0 = v0.Y - minY * v0.W; d1 = v1.Y - minY * v1.W; break; // Bottom
+                    case 3: d0 = maxY * v0.W - v0.Y; d1 = maxY * v1.W - v1.Y; break; // Top
+                    case 4: d0 = v0.Z; d1 = v1.Z; break; // Near
+                    case 5: d0 = v0.W - v0.Z; d1 = v1.W - v1.Z; break; // Far
+                    default: d0 = 0; d1 = 0; break;
                 }
 
                 bool b0 = d0 >= 0;
@@ -1993,13 +1599,10 @@ public static class LevelFunctions
                 {
                     continue;
                 }
-                else if ((b0 && !b1) || (!b0 && b1))
+                else if (b0 != b1)
                 {
-                    Vector4 point0;
-                    Vector4 point1;
-
+                    Vector4 point0, point1;
                     float t = d0 / (d0 - d1);
-
                     Vector4 intersectionPoint = Vector4.Lerp(v0, v1, t);
 
                     if (b0)
@@ -2015,55 +1618,43 @@ public static class LevelFunctions
                         intersectionPoint1 = intersectionPoint;
                     }
 
-                    temporaryEdges[temporaryverticescount] = point0;
-                    temporaryEdges[temporaryverticescount + 1] = point1;
-                    temporaryverticescount += 2;
+                    temporaryBuffer[temporaryCount] = new EdgeVertex { c = point0, b = true };
+                    temporaryBuffer[temporaryCount + 1] = new EdgeVertex { c = point1, b = true };
+                    temporaryCount += 2;
 
-                    boolEdges[c] = false;
-                    boolEdges[c + 1] = false;
+                    processBuffer[c].b = false;
+                    processBuffer[c + 1].b = false;
 
                     intersection += 1;
                 }
                 else
                 {
-                    boolEdges[c] = false;
-                    boolEdges[c + 1] = false;
+                    processBuffer[c].b = false;
+                    processBuffer[c + 1].b = false;
                 }
             }
 
             if (intersection == 2)
             {
-                for (int d = 0; d < temporaryverticescount; d += 2)
+                for (int d = 0; d < temporaryCount; d += 2)
                 {
-                    processEdges[processverticescount] = temporaryEdges[d];
-                    processEdges[processverticescount + 1] = temporaryEdges[d + 1];
-                    processverticescount += 2;
-                    boolEdges[processboolcount] = true;
-                    boolEdges[processboolcount + 1] = true;
-                    processboolcount += 2;
+                    processBuffer[processCount] = temporaryBuffer[d];
+                    processBuffer[processCount + 1] = temporaryBuffer[d + 1];
+                    processCount += 2;
                 }
 
-                processEdges[processverticescount] = intersectionPoint0;
-                processEdges[processverticescount + 1] = intersectionPoint1;
-                processverticescount += 2;
-                boolEdges[processboolcount] = true;
-                boolEdges[processboolcount + 1] = true;
-                processboolcount += 2;
+                processBuffer[processCount] = new EdgeVertex { c = intersectionPoint0, b = true };
+                processBuffer[processCount + 1] = new EdgeVertex { c = intersectionPoint1, b = true };
+                processCount += 2;
             }
         }
 
-        for (int e = 0; e < processboolcount; e += 2)
+        for (int e = 0; e < processCount; e += 2)
         {
-            if (boolEdges[e] == true && boolEdges[e + 1] == true)
+            if (processBuffer[e].b && processBuffer[e + 1].b)
             {
-                Vector4 clip0 = processEdges[e];
-                Vector4 clip1 = processEdges[e + 1];
-
-                Vector3 ndc0 = ConvertClipToNDC(clip0);
-                Vector3 ndc1 = ConvertClipToNDC(clip1);
-
-                OutEdgeVertices.Add(ndc0);
-                OutEdgeVertices.Add(ndc1);
+                OutEdgeVertices.Add(ConvertClipToNDC(processBuffer[e].c));
+                OutEdgeVertices.Add(ConvertClipToNDC(processBuffer[e + 1].c));
             }
         }
 
@@ -2072,17 +1663,12 @@ public static class LevelFunctions
             return Vector4.Zero;
         }
 
-        float xmin = float.PositiveInfinity;
-        float ymin = float.PositiveInfinity;
-        float xmax = float.NegativeInfinity;
-        float ymax = float.NegativeInfinity;
+        float xmin = float.PositiveInfinity, ymin = float.PositiveInfinity;
+        float xmax = float.NegativeInfinity, ymax = float.NegativeInfinity;
 
-        int count = OutEdgeVertices.Count;
-
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < OutEdgeVertices.Count; i++)
         {
             Vector3 ndc = OutEdgeVertices[i];
-
             xmin = MathF.Min(xmin, ndc.X);
             xmax = MathF.Max(xmax, ndc.X);
             ymin = MathF.Min(ymin, ndc.Y);
@@ -2092,20 +1678,20 @@ public static class LevelFunctions
         return new Vector4(xmin, ymin, xmax, ymax);
     }
 
-    public static void DrawTiles(Tile[] tiles, TileTriangle[] ArrayOfTileTriangles, Triangle[] ArrayOfTriangles, int Width, int Height, int texWidth, int texHeight, int maskX, int maskY, uint[][] sampleTexture, uint[] backBuffer, float[] depthBuffer)
+    public static void DrawTiles(int tilesX, int tilesY, int[] triangleCount, TileTriangle[] ArrayOfTileTriangles, Triangle[] ArrayOfTriangles, int Width, int Height, int texWidth, int texHeight, int maskX, int maskY, uint[][] sampleTexture, uint[] backBuffer, float[] depthBuffer)
     {
-        int totalTiles = tiles.Length;
+
+        int totalTiles = tilesX * tilesY;
         for (int t = 0; t < totalTiles; t++)
         {
-            Tile tile = tiles[t];
-            if (tile.triangleCount == 0)
+            if (triangleCount[t] == 0)
             {
                 continue;
             }
 
             int startOffset = t * 128;
 
-            for (int bt = 0; bt < tile.triangleCount; bt++)
+            for (int bt = 0; bt < triangleCount[t]; bt++)
             {
                 var tt = ArrayOfTileTriangles[startOffset + bt];
 
@@ -2157,27 +1743,30 @@ public static class LevelFunctions
                     {
                         if (edge0 <= 0f && edge1 <= 0f && edge2 <= 0f)
                         {
-                            float invWeight = 1.0f / incW;
-                            float z = incZ * invWeight;
-
-                            if (z < depthBuffer[p])
+                            if (incW != 0f)
                             {
-                                depthBuffer[p] = z;
+                                float invWeight = 1.0f / incW;
+                                float z = incZ * invWeight;
 
-                                float texX = incU * invWeight;
-                                float texY = incV * invWeight;
+                                if (z < depthBuffer[p])
+                                {
+                                    depthBuffer[p] = z;
 
-                                int tx = ((int)texX - (texX < 0 ? 1 : 0)) & maskX;
-                                int ty = ((int)texY - (texY < 0 ? 1 : 0)) & maskY;
+                                    float texX = incU * invWeight;
+                                    float texY = incV * invWeight;
 
-                                uint col = sampleTexture[tri.texture][ty * texWidth + tx];
+                                    int tx = ((int)texX - (texX < 0 ? 1 : 0)) & maskX;
+                                    int ty = ((int)texY - (texY < 0 ? 1 : 0)) & maskY;
 
-                                byte r = (byte)(((col >> 0) & 255) * diffuse);
-                                byte g = (byte)(((col >> 8) & 255) * diffuse);
-                                byte b = (byte)(((col >> 16) & 255) * diffuse);
-                                byte a = (byte)((col >> 24) & 255);
+                                    uint col = sampleTexture[tri.texture][ty * texWidth + tx];
 
-                                backBuffer[p] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
+                                    byte r = (byte)(((col >> 0) & 255) * diffuse);
+                                    byte g = (byte)(((col >> 8) & 255) * diffuse);
+                                    byte b = (byte)(((col >> 16) & 255) * diffuse);
+                                    byte a = (byte)((col >> 24) & 255);
+
+                                    backBuffer[p] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
+                                }
                             }
                         }
 
@@ -2205,20 +1794,19 @@ public static class LevelFunctions
         }
     }
 
-    public static void DrawTilesParallel(Tile[] tiles, TileTriangle[] ArrayOfTileTriangles, Triangle[] ArrayOfTriangles, int Width, int Height, int texWidth, int texHeight, int maskX, int maskY, uint[][] sampleTexture, uint[] backBuffer, float[] depthBuffer)
+    public static void DrawTilesParallel(int tilesX, int tilesY, int[] triangleCount, TileTriangle[] ArrayOfTileTriangles, Triangle[] ArrayOfTriangles, int Width, int Height, int texWidth, int texHeight, int maskX, int maskY, uint[][] sampleTexture, uint[] backBuffer, float[] depthBuffer)
     {
-        int totalTiles = tiles.Length;
+        int totalTiles = tilesX * tilesY;
         Parallel.For(0, totalTiles, t =>
         {
-            Tile tile = tiles[t];
-            if (tile.triangleCount == 0)
+            if (triangleCount[t] == 0)
             {
                 return;
             }
 
             int startOffset = t * 128;
 
-            for (int bt = 0; bt < tile.triangleCount; bt++)
+            for (int bt = 0; bt < triangleCount[t]; bt++)
             {
                 var tt = ArrayOfTileTriangles[startOffset + bt];
 
@@ -2270,27 +1858,30 @@ public static class LevelFunctions
                     {
                         if (edge0 <= 0f && edge1 <= 0f && edge2 <= 0f)
                         {
-                            float invWeight = 1.0f / incW;
-                            float z = incZ * invWeight;
-
-                            if (z < depthBuffer[p])
+                            if (incW != 0f)
                             {
-                                depthBuffer[p] = z;
+                                float invWeight = 1.0f / incW;
+                                float z = incZ * invWeight;
 
-                                float texX = incU * invWeight;
-                                float texY = incV * invWeight;
+                                if (z < depthBuffer[p])
+                                {
+                                    depthBuffer[p] = z;
 
-                                int tx = ((int)texX - (texX < 0 ? 1 : 0)) & maskX;
-                                int ty = ((int)texY - (texY < 0 ? 1 : 0)) & maskY;
+                                    float texX = incU * invWeight;
+                                    float texY = incV * invWeight;
 
-                                uint col = sampleTexture[tri.texture][ty * texWidth + tx];
+                                    int tx = ((int)texX - (texX < 0 ? 1 : 0)) & maskX;
+                                    int ty = ((int)texY - (texY < 0 ? 1 : 0)) & maskY;
 
-                                byte r = (byte)(((col >> 0) & 255) * diffuse);
-                                byte g = (byte)(((col >> 8) & 255) * diffuse);
-                                byte b = (byte)(((col >> 16) & 255) * diffuse);
-                                byte a = (byte)((col >> 24) & 255);
+                                    uint col = sampleTexture[tri.texture][ty * texWidth + tx];
 
-                                backBuffer[p] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
+                                    byte r = (byte)(((col >> 0) & 255) * diffuse);
+                                    byte g = (byte)(((col >> 8) & 255) * diffuse);
+                                    byte b = (byte)(((col >> 16) & 255) * diffuse);
+                                    byte a = (byte)((col >> 24) & 255);
+
+                                    backBuffer[p] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
+                                }
                             }
                         }
 
@@ -2316,5 +1907,92 @@ public static class LevelFunctions
                 }
             }
         });
+    }
+
+    public static void DrawTilesOther(int tilesX, int tilesY, int[] triangleCount, TileTriangle[] ArrayOfTileTriangles, Triangle[] ArrayOfTriangles, int Width, int Height, int texWidth, int texHeight, int maskX, int maskY, uint[][] sampleTexture, uint[] backBuffer, float[] depthBuffer)
+    {
+
+        int totalTiles = tilesX * tilesY;
+        for (int t = 0; t < totalTiles; t++)
+        {
+            if (triangleCount[t] == 0)
+            {
+                continue;
+            }
+
+            int startOffset = t * 128;
+
+            for (int bt = 0; bt < triangleCount[t]; bt++)
+            {
+                var tt = ArrayOfTileTriangles[startOffset + bt];
+
+                int triId = tt.triangleIndex;
+                Triangle tri = ArrayOfTriangles[triId];
+
+                int startY = tt.miny;
+                int endY = tt.maxy;
+                int startX = tt.minx;
+                int endX = tt.maxx;
+
+                if (startX >= endX || startY >= endY)
+                {
+                    continue;
+                }
+
+                float diffuse = tri.diffuse;
+
+                for (int y = startY; y < endY; y++)
+                {
+                    int rowOffset = y * Width;
+                    float py = y + 0.5f;
+
+                    for (int x = startX; x < endX; x++)
+                    {
+                        float px = x + 0.5f;
+
+                        float edge0 = tri.edgeA0 * px + tri.edgeB0 * py + tri.edgeC0;
+                        float edge1 = tri.edgeA1 * px + tri.edgeB1 * py + tri.edgeC1;
+                        float edge2 = tri.edgeA2 * px + tri.edgeB2 * py + tri.edgeC2;
+
+                        if (edge0 <= 0f && edge1 <= 0f && edge2 <= 0f)
+                        {
+                            float weight0 = edge0 * tri.invArea;
+                            float weight1 = edge1 * tri.invArea;
+                            float weight2 = edge2 * tri.invArea;
+
+                            float combinedWeight = weight0 * tri.invw0 + weight1 * tri.invw1 + weight2 * tri.invw2;
+
+                            if (combinedWeight != 0f)
+                            {
+                                float invWeight = 1.0f / combinedWeight;
+                                float z = (weight0 * tri.invz0 + weight1 * tri.invz1 + weight2 * tri.invz2) * invWeight;
+
+                                int p = rowOffset + x;
+
+                                if (z < depthBuffer[p])
+                                {
+                                    depthBuffer[p] = z;
+
+                                    float texX = (weight0 * tri.invuv0.X + weight1 * tri.invuv1.X + weight2 * tri.invuv2.X) * invWeight;
+                                    float texY = (weight0 * tri.invuv0.Y + weight1 * tri.invuv1.Y + weight2 * tri.invuv2.Y) * invWeight;
+
+                                    int tx = ((int)texX - (texX < 0 ? 1 : 0)) & maskX;
+                                    int ty = ((int)texY - (texY < 0 ? 1 : 0)) & maskY;
+
+                                    uint col = sampleTexture[tri.texture][ty * texWidth + tx];
+
+                                    byte r = (byte)(((col >> 0) & 255) * diffuse);
+                                    byte g = (byte)(((col >> 8) & 255) * diffuse);
+                                    byte b = (byte)(((col >> 16) & 255) * diffuse);
+                                    byte a = (byte)((col >> 24) & 255);
+
+                                    backBuffer[p] = (uint)(r | (g << 8) | (b << 16) | (a << 24));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
