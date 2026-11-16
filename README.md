@@ -14,19 +14,11 @@ I don't know how to make it cross platform.
 
 
 
-You need SDL3.DLL and it uses the SDL3-CS NuGet package.
+It uses the SDL3-CS bindings and Windows SDL3-CS NuGet packages.
 
 
 
-SDL3 - [https://github.com/libsdl-org/SDL](https://github.com/libsdl-org/SDL)
-
-
-
-Put SDL3.DLL with the exe you build.
-
-
-
-Put the assets folder with the exe you build.
+Put the assets folder with the exe you build in Debug or Release.
 
 
 
