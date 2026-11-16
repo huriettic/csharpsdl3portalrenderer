@@ -50,6 +50,8 @@ public static class LevelDraw
     static ClipVertex[] processPipeline = new ClipVertex[256];
     static ClipVertex[] temporaryPipeline = new ClipVertex[256];
 
+    static List<int> vertexIndices = new List<int>();
+    static List<int> wallTypes = new List<int>(); // -1 for solid, sector index for portal
     static List<SectorMeta> Sectors = new();
     static List<List<SectorMeta>> ListOfSectorLists = new();
     static TileTriangle[] ArrayOfTileTriangles = Array.Empty<TileTriangle>();
@@ -240,17 +242,17 @@ public static class LevelDraw
                 return;
             }
 
-            LoadFromFile(levelTH, vertices, sectors, starts);
+            LoadFromFile(levelTH, vertices, vertexIndices, wallTypes, sectors, starts);
         }
         else
         {
-            LoadFromFile(levelPortals, vertices, sectors, starts);
+            LoadFromFile(levelPortals, vertices, vertexIndices, wallTypes, sectors, starts);
         }
 
         BuildObjects(starts, sectors, TopLevelLists.positions);
 
         BuildGeometry(
-            sectors, vertices, Ceiling, Floor,
+            sectors, vertexIndices, wallTypes, vertices, Ceiling, Floor,
             temporaryVertices, temporaryTriangles,
             LeftPlane, TopPlane,
             TopLevelLists.planes, TopLevelLists.edges, TopLevelLists.lines, TopLevelLists.portals,

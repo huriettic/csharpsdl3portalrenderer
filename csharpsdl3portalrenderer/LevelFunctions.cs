@@ -19,16 +19,18 @@ public struct Triangle
 };
 
 [Serializable]
-public class Sector
+public struct Sector
 {
     public float floorHeight;
     public float ceilingHeight;
-    public List<int> vertexIndices = new List<int>();
-    public List<int> wallTypes = new List<int>(); // -1 for solid, sector index for portal
+    public int vertexStartIndex;
+    public int vertexCount;
+    public int wallTypesIndexStart;
+    public int wallTypesCount;
 };
 
 [Serializable]
-public class StartSector
+public struct StartSector
 {
     public Vector2 location;
     public float angle;
@@ -108,6 +110,7 @@ public struct MeshMeta
     public int indicesCount;
 
     public int triangles;
+    public int sectorId;
 };
 
 [Serializable]
@@ -950,7 +953,7 @@ public static class LevelFunctions
         Console.WriteLine("Objects built successfully!");
     }
 
-    public static void LoadFromFile(string read, List<Vector2> vertices, List<Sector> sectors, List<StartSector> starts)
+    public static void LoadFromFile(string read, List<Vector2> vertices, List<int> vertexIndices, List<int> wallTypes, List<Sector> sectors, List<StartSector> starts)
     {
         string text = File.ReadAllText(read);
 
@@ -991,7 +994,6 @@ public static class LevelFunctions
                     if (heightParts.Length == 2)
                     {
                         sector.floorHeight = float.Parse(heightParts[0]);
-
                         sector.ceilingHeight = float.Parse(heightParts[1]);
                     }
 
@@ -999,17 +1001,22 @@ public static class LevelFunctions
 
                     int half = values.Length / 2;
 
+                    sector.vertexStartIndex = vertexIndices.Count;
+                    sector.wallTypesIndexStart = wallTypes.Count;
+
                     for (int e = 0; e < values.Length; e++)
                     {
                         if (int.TryParse(values[e], out int val))
                         {
                             if (e < half)
                             {
-                                sector.vertexIndices.Add(val);
+                                vertexIndices.Add(val);
+                                sector.vertexCount += 1;
                             }
                             else
                             {
-                                sector.wallTypes.Add(val);
+                                wallTypes.Add(val);
+                                sector.wallTypesCount += 1;
                             }
                         }
                     }
@@ -1069,7 +1076,7 @@ public static class LevelFunctions
         return new Vector3(vertex.X * invw, vertex.Y * invw, vertex.Z * invw);
     }
 
-    public static void BuildGeometry(List<Sector> sectors, List<Vector2> vertices, double Ceiling, double Floor, List<Vertex> temporaryVertices, List<int> temporaryTriangles, MathematicalPlane LeftPlane, MathematicalPlane TopPlane, List<MathematicalPlane> planes, List<Vector3> edges, List<int> lines, List<PortalMeta> portals, List<Vector3> ceilingVertices, List<Vector3> ceilingTextures, List<int> ceilingTriangles, List<Vector3> floorVertices, List<Vector3> floorTextures, List<int> floorTriangles, List<MeshMeta> meshes, List<Vertex> Vertices, List<int> Indices, List<SectorMeta> Sectors)
+    public static void BuildGeometry(List<Sector> sectors, List<int> vertexIndices, List<int> wallTypes, List<Vector2> vertices, double Ceiling, double Floor, List<Vertex> temporaryVertices, List<int> temporaryTriangles, MathematicalPlane LeftPlane, MathematicalPlane TopPlane, List<MathematicalPlane> planes, List<Vector3> edges, List<int> lines, List<PortalMeta> portals, List<Vector3> ceilingVertices, List<Vector3> ceilingTextures, List<int> ceilingTriangles, List<Vector3> floorVertices, List<Vector3> floorTextures, List<int> floorTriangles, List<MeshMeta> meshes, List<Vertex> Vertices, List<int> Indices, List<SectorMeta> Sectors)
     {
         int portalStart = 0;
 
@@ -1093,12 +1100,15 @@ public static class LevelFunctions
 
             Sector sector = sectors[i];
 
-            for (int e = 0; e < sector.vertexIndices.Count; e++)
+            for (int e = sector.vertexStartIndex; e < sector.vertexStartIndex + sector.vertexCount; e++)
             {
-                int current = sector.vertexIndices[e];
-                int next = sector.vertexIndices[(e + 1) % sector.vertexIndices.Count];
+                int localIndex = e - sector.vertexStartIndex;
 
-                int wall = sector.wallTypes[(e + 1) % sector.wallTypes.Count];
+                int current = vertexIndices[e];
+
+                int next = vertexIndices[sector.vertexStartIndex + ((localIndex + 1) % sector.vertexCount)];
+
+                int wall = wallTypes[sector.wallTypesIndexStart + ((localIndex + 1) % sector.wallTypesCount)];
 
                 double X1 = -vertices[current].X / 2 * 2.5f;
                 double Z1 = vertices[current].Y / 2 * 2.5f;
@@ -1380,12 +1390,12 @@ public static class LevelFunctions
 
                 float tinyNumber = 1e-6f;
 
-                for (int e = 0; e < sector.vertexIndices.Count; ++e)
+                for (int e = sector.vertexStartIndex; e < sector.vertexStartIndex + sector.vertexCount; ++e)
                 {
                     double YF = sector.floorHeight / 8 * 2.5f;
                     double YC = sector.ceilingHeight / 8 * 2.5f;
-                    double X = -vertices[sector.vertexIndices[e]].X / 2 * 2.5f;
-                    double Z = vertices[sector.vertexIndices[e]].Y / 2 * 2.5f;
+                    double X = -vertices[vertexIndices[e]].X / 2 * 2.5f;
+                    double Z = vertices[vertexIndices[e]].Y / 2 * 2.5f;
 
                     float OX = -(float)X / 2.5f;
                     float OY = (float)Z / 2.5f;
@@ -1516,7 +1526,8 @@ public static class LevelFunctions
                 verticesCount = temporaryVertices.Count,
                 indicesStartIndex = indicesStart,
                 indicesCount = temporaryTriangles.Count,
-                triangles = temporaryTriangles.Count / 3
+                triangles = temporaryTriangles.Count / 3,
+                sectorId = i
             };
 
             meshes.Add(mesh);
