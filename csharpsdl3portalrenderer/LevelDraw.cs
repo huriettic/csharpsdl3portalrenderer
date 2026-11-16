@@ -228,14 +228,6 @@ public static class LevelDraw
 
     static void Main(string[] args)
     {
-        string sdl3Path = Path.GetFullPath("SDL3.dll");
-
-        if (!File.Exists(sdl3Path))
-        {
-            Console.WriteLine("SDL 3 not found!");
-            return;
-        }
-
         string levelPortals = Path.GetFullPath("assets/map-clear.txt");
 
         if (!File.Exists(levelPortals))
