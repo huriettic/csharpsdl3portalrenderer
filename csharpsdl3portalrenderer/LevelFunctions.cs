@@ -229,23 +229,26 @@ public static class LevelFunctions
                         continue;
                     }
 
-                    if (SectorsContains(sectorpolygon.sectorId, contact))
+                    if (sector.sectorId == ASector.sectorId)
                     {
-                        ArrayOfRectangles[(connectedsector * 32) + nextcount] = rectangleIn;
-
-                        visibleSectors[connectedsector] = nextcount + 1;
-
-                        SectorMeta ContactSector = new SectorMeta
+                        if (SectorsContains(sectorpolygon.sectorId, contact))
                         {
-                            portalStartIndex = connectedstart,
-                            portalCount = connectedcount,
-                            rectangle = nextcount,
-                            sectorId = connectedsector
-                        };
+                            ArrayOfRectangles[(connectedsector * 32) + nextcount] = rectangleIn;
 
-                        ListOfSectorLists[output].Add(ContactSector);
+                            visibleSectors[connectedsector] = nextcount + 1;
 
-                        continue;
+                            SectorMeta ContactSector = new SectorMeta
+                            {
+                                portalStartIndex = connectedstart,
+                                portalCount = connectedcount,
+                                rectangle = nextcount,
+                                sectorId = connectedsector
+                            };
+
+                            ListOfSectorLists[output].Add(ContactSector);
+
+                            continue;
+                        }
                     }
 
                     Vector4 rectangleOut = MakeRectangleWithEdges(rectangleIn, polygon, OutEdgeVertices, CamViewProj, edges, lines, processBuffer, temporaryBuffer);
