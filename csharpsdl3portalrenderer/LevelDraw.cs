@@ -58,6 +58,7 @@ public static class LevelDraw
     static int[] triangleCount = new int[tilesX * tilesY];
     static Vector4[] ArrayOfRectangles = Array.Empty<Vector4>();
     static int[] visibleSectors = Array.Empty<int>();
+    static int[] sectorPortals = Array.Empty<int>();
     static int[] contactingSectors = Array.Empty<int>();
     static uint[][] textures = Array.Empty<uint[]>();
 
@@ -266,12 +267,17 @@ public static class LevelDraw
 
         CurrentSector = PlayerStart(TopLevelLists.positions, TopLevelLists.sectors, rng, ref playerStartPosition);
 
-        ListOfSectorLists = MakeLists();
+        ListOfSectorLists = new List<List<SectorMeta>>();
+        for (int i = 0; i < 2; i++)
+        {
+            ListOfSectorLists.Add(new List<SectorMeta>());
+        }
         ArrayOfTileTriangles = new TileTriangle[(tilesX * tilesY) * 128];
         Triangles = new Triangle[TopLevelLists.sectors.Count * 128];
-        ArrayOfRectangles = new Vector4[TopLevelLists.sectors.Count * 32];
-        visibleSectors = VisibleSectorsMake(TopLevelLists.sectors);
-        contactingSectors = contactSectorsMake(TopLevelLists.sectors);
+        ArrayOfRectangles = new Vector4[TopLevelLists.sectors.Count * 8];
+        visibleSectors = new int[TopLevelLists.sectors.Count];
+        sectorPortals = new int[TopLevelLists.sectors.Count * 8];
+        contactingSectors = new int[TopLevelLists.sectors.Count];
         textures = new uint[4][];
 
         for ( int i = 0; i < textures.Length; i++)
@@ -350,7 +356,7 @@ public static class LevelDraw
             );
             Array.Clear(visibleSectors, 0, visibleSectors.Length);
             GetPortals(
-            CurrentSector, ListOfSectorLists, ArrayOfRectangles, visibleSectors,
+            CurrentSector, ListOfSectorLists, ArrayOfRectangles, visibleSectors, sectorPortals,
             TopLevelLists.portals, planeDistance, TopLevelLists.planes,
             TopLevelLists.sectors, Sectors, OutEdgeVertices,
             Camera3D.Position, Camera3D.ViewProjectionMatrix,
